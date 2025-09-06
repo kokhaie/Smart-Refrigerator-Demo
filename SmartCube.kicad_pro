@@ -226,7 +226,24 @@
     "equivalence_files": []
   },
   "erc": {
-    "erc_exclusions": [],
+    "erc_exclusions": [
+      [
+        "power_pin_not_driven|1790700|1079500|3e0811d0-ebca-435e-9c8d-2e97412eae22|00000000-0000-0000-0000-000000000000|/8c7b75b0-82e4-484b-b5c4-3f36dca5b6e0|/8c7b75b0-82e4-484b-b5c4-3f36dca5b6e0|",
+        ""
+      ],
+      [
+        "power_pin_not_driven|2197100|1955800|20669bc7-e9fb-41fb-8c1c-9dfc3aac81c1|00000000-0000-0000-0000-000000000000|/8c7b75b0-82e4-484b-b5c4-3f36dca5b6e0|/8c7b75b0-82e4-484b-b5c4-3f36dca5b6e0|",
+        ""
+      ],
+      [
+        "power_pin_not_driven|863600|2324100|e8b7f89b-a3be-40b2-aefe-c7d5c0b90640|00000000-0000-0000-0000-000000000000|/8c7b75b0-82e4-484b-b5c4-3f36dca5b6e0|/8c7b75b0-82e4-484b-b5c4-3f36dca5b6e0|",
+        ""
+      ],
+      [
+        "power_pin_not_driven|876300|2413000|97918cf5-346a-49fc-9729-1c52dad526ab|00000000-0000-0000-0000-000000000000|/8c7b75b0-82e4-484b-b5c4-3f36dca5b6e0|/8c7b75b0-82e4-484b-b5c4-3f36dca5b6e0|",
+        ""
+      ]
+    ],
     "meta": {
       "version": 0
     },
@@ -723,6 +740,14 @@
       "version": 1
     },
     "net_format_name": "",
+    "ngspice": {
+      "fix_include_paths": true,
+      "meta": {
+        "version": 0
+      },
+      "model_mode": 4,
+      "workbook_filename": ""
+    },
     "page_layout_descr_file": "",
     "plot_directory": "",
     "space_save_all_events": true,
