@@ -530,16 +530,7 @@
 					(hide yes)
 				)
 			)
-			(property "Description" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "MF" "Silicon Labs"
+			(property "Description" "USB to UART Bridge"
 				(at 0 0 0)
 				(effects
 					(font
@@ -549,7 +540,7 @@
 					(hide yes)
 				)
 			)
-			(property "DESCRIPTION" "USB to UART Bridge"
+			(property "MF" "Silicon Labs"
 				(at 0 0 0)
 				(effects
 					(font
