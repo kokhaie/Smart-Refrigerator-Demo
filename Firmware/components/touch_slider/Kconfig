@@ -1,0 +1,33 @@
+menu "Touch Slider Config"
+
+    config TOUCH_SLIDER_PAD1_CHANNEL
+        int "Touch Pad 1 Channel Number"
+        default 1
+        help
+            The touch channel number (e.g., 4 for TOUCH_PAD_NUM4) for the first slider pad.
+
+    config TOUCH_SLIDER_PAD2_CHANNEL
+        int "Touch Pad 2 Channel Number"
+        default 2
+        help
+            The touch channel number for the second slider pad.
+
+    config TOUCH_SLIDER_PAD3_CHANNEL
+        int "Touch Pad 3 Channel Number"
+        default 12
+        help
+            The touch channel number for the third slider pad.
+
+    config TOUCH_SLIDER_PAD4_CHANNEL
+        int "Touch Pad 4 Channel Number"
+        default 13
+        help
+            The touch channel number for the fourth slider pad.
+
+    config TOUCH_SLIDER_PAD5_CHANNEL
+        int "Touch Pad 5 Channel Number"
+        default 14
+        help
+            The touch channel number for the fifth slider pad.
+
+endmenu

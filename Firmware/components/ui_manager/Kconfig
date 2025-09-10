@@ -1,0 +1,86 @@
+menu "TFT Display & UI Configuration"
+
+config LCD_ENABLED
+    bool "Enable LCD Display"
+    default y
+    help
+        Enable this to initialize and use the TFT display. If disabled, all display-related
+        code will be excluded from the build.
+
+if LCD_ENABLED
+
+menu "Display Dimensions & Timings"
+    config LCD_H_RES
+        int "Horizontal Resolution (pixels)"
+        default 240
+        help
+            The horizontal resolution of your display panel.
+
+    config LCD_V_RES
+        int "Vertical Resolution (pixels)"
+        default 280
+        help
+            The vertical resolution of your display panel.
+
+    config LCD_PIXEL_CLOCK_HZ
+        int "Pixel Clock Speed (Hz)"
+        default 10000000
+        help
+            The speed of the WR (write) signal. Start with a safe value like 2MHz (2000000)
+            and increase for better performance. 10MHz is often stable for ST7789.
+endmenu
+
+menu "GPIO Pin Configuration"
+    config LCD_PIN_CS
+        int "CS (Chip Select) Pin"
+        default 38
+    config LCD_PIN_DC
+        int "DC (Data/Command) Pin"
+        default 39
+    config LCD_PIN_RST
+        int "RST (Reset) Pin"
+        default 41
+    config LCD_PIN_WR
+        int "WR (Write Strobe) Pin"
+        default 40
+    config LCD_PIN_DATA0
+        int "Data Pin 0 (DB0)"
+        default 11
+    config LCD_PIN_DATA1
+        int "Data Pin 1 (DB1)"
+        default 10
+    config LCD_PIN_DATA2
+        int "Data Pin 2 (DB2)"
+        default 9
+    config LCD_PIN_DATA3
+        int "Data Pin 3 (DB3)"
+        default 8
+    config LCD_PIN_DATA4
+        int "Data Pin 4 (DB4)"
+        default 7
+    config LCD_PIN_DATA5
+        int "Data Pin 5 (DB5)"
+        default 6
+    config LCD_PIN_DATA6
+        int "Data Pin 6 (DB6)"
+        default 5
+    config LCD_PIN_DATA7
+        int "Data Pin 7 (DB7)"
+        default 4
+
+    config LCD_USE_TE_SYNC
+        bool "Use Tearing Effect (TE) Pin for Sync"
+        default y
+        help
+            Enable to use the TE pin for V-sync to prevent screen tearing.
+            Recommended for smooth animation.
+
+    if LCD_USE_TE_SYNC
+    config LCD_PIN_TE
+        int "TE (Tearing Effect) Pin"
+        default 42
+    endif
+endmenu
+
+endif
+endmenu
