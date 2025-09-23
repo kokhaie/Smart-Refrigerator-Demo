@@ -1,11 +1,58 @@
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+
+#include "network_manager.h"
 #include "sensor_manager.h"
+#include "business_logic.h"
 #include "touch_slider.h"
+#include "motors.h"
 
 static const char *TAG = "MAIN_APP";
-void main_app_task(void *pvParameters)
+
+void sensor_manager_task(void *pvParameters)
+{
+    ina226_data_t power_data;
+    mpu6050_data_t imu_data;
+    shtc3_data_t temp_data;
+    g_setpoint_queue = xQueueCreate(1, sizeof(float));
+
+    for (;;)
+    {
+        if (sensor_manager_read_ina226(&power_data) == ESP_OK)
+        {
+            ESP_LOGI(TAG, "INA226 -> Voltage: %.2f V, Current: %.3f A", power_data.bus_voltage_v, power_data.current_a);
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Failed to read INA226");
+        }
+
+        if (sensor_manager_read_shtc3(&temp_data) == ESP_OK)
+        {
+            ESP_LOGI(TAG, "SHTC3  -> Temp: %.2f C, Humidity: %.1f %%", temp_data.temperature_c, temp_data.humidity_rh);
+            update_setpoint(temp_data.temperature_c);
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Failed to read SHTC3");
+        }
+
+        if (sensor_manager_read_mpu6050(&imu_data) == ESP_OK)
+        {
+            ESP_LOGI(TAG, "MPU6050 -> Accel(g) X:%.2f Y:%.2f Z:%.2f | Gyro(dps) X:%.2f Y:%.2f Z:%.2f | Pitch:%.1f Roll:%.1f",
+                     imu_data.accel_x_g, imu_data.accel_y_g, imu_data.accel_z_g,
+                     imu_data.gyro_x_dps, imu_data.gyro_y_dps, imu_data.gyro_z_dps,
+                     imu_data.pitch, imu_data.roll);
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Failed to read MPU6050");
+        }
+    }
+}
+void touch_slider_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "Main application task started.");
     uint32_t last_position = 999; // Store last position to avoid spamming the log
@@ -35,43 +82,58 @@ void main_app_task(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(20)); // Poll for events and state at 50Hz
     }
 }
+void ui_manager_task(void *pvParameters) {}
+void network_manager_task(void *pvParameters) {}
+void business_logic_task(void *pvParameters) {}
+void anomaly_detection_task(void *pvParameters) {}
 
 void app_main(void)
 {
-    // // Initialize all sensors with one function call
-    // sensor_manager_init();
-
-    // // Create structs to hold the data for each sensor
-    // ina226_data_t power_data;
-    // shtc3_data_t env_data;
-    // mpu6050_data_t imu_data;
+    network_manager_init();
+    sensor_manager_init();
     touch_slider_init();
+    motors_init();
+    //  ui manager init
 
-    // // Read each sensor individually
-    // if (sensor_manager_read_ina226(&power_data) == ESP_OK) {
-    //     ESP_LOGI(TAG, "INA226 -> Voltage: %.2f V, Current: %.3f A", power_data.bus_voltage_v, power_data.current_a);
-    // } else {
-    //     ESP_LOGE(TAG, "Failed to read INA226");
-    // }
+    /*
+     * =================================================================
+     * ESP32-S3 R8N8 Dual-Core Task Assignment Plan
+     * =================================================================
+     *
+     * -----------------------------------------------------------------
+     * Core 0: Protocol, UI, and Non-Real-Time Tasks
+     * -----------------------------------------------------------------
+     * Responsible for tasks that are I/O bound (wait for network/user)
+     * or are less time-sensitive. The Wi-Fi stack runs here by default.
+     *
+     * Components on Core 0:
+     * - Wi-Fi Handler: Manages Wi-Fi connection and events.
+     * - MQTT Client: Handles all MQTT communication (pub/sub).
+     * - Touch Sensor Input: Reads user input from the touch slider.
+     * - LCD Display Controller: Updates the screen (UI rendering).
+     * - User Behavior Model: Low-priority, CPU-intensive background task.
+     *
+     *
+     * -----------------------------------------------------------------
+     * Core 1: Real-Time Control and High-Speed Processing
+     * -----------------------------------------------------------------
+     * Dedicated to time-critical tasks that require consistent,
+     * low-latency execution to ensure system stability and safety.
+     *
+     * Components on Core 1:
+     * - Motor Controller (PID Loop): Highest priority for stable control.
+     * - I2C Sensors Reader: High priority to feed data with low delay.
+     * - Vibration Anomaly Model: Medium priority, processes sensor data
+     * without interfering with the primary motor control loop.
+     *
+     * =================================================================
+     */
 
-    // if (sensor_manager_read_shtc3(&env_data) == ESP_OK) {
-    //     ESP_LOGI(TAG, "SHTC3  -> Temp: %.2f C, Humidity: %.1f %%", env_data.temperature_c, env_data.humidity_rh);
-    // } else {
-    //     ESP_LOGE(TAG, "Failed to read SHTC3");
-    // }
+    xTaskCreatePinnedToCore(touch_slider_task, "touch_slider_task", 4096, NULL, 12, NULL, 0);
+    xTaskCreatePinnedToCore(network_manager_task, "network_manager_task", 4096, NULL, 10, NULL, 0);
+    xTaskCreatePinnedToCore(ui_manager_task, "ui_manager_task", 4096, NULL, 8, NULL, 0);
 
-    // if (sensor_manager_read_mpu6050(&imu_data) == ESP_OK)
-    // {
-    //     ESP_LOGI(TAG, "MPU6050 -> Accel(g) X:%.2f Y:%.2f Z:%.2f | Gyro(dps) X:%.2f Y:%.2f Z:%.2f | Pitch:%.1f Roll:%.1f",
-    //              imu_data.accel_x_g, imu_data.accel_y_g, imu_data.accel_z_g,
-    //              imu_data.gyro_x_dps, imu_data.gyro_y_dps, imu_data.gyro_z_dps,
-    //              imu_data.pitch, imu_data.roll);
-    // }
-    // else
-    // {
-    //     ESP_LOGE(TAG, "Failed to read MPU6050");
-    // }
-
-    xTaskCreate(main_app_task, "main_app_task", 4096, NULL, 5, NULL);
-    // vTaskDelay(pdMS_TO_TICKS(500));
+    xTaskCreatePinnedToCore(sensor_manager_task, "sensor_manager_task", 4096, NULL, 12, NULL, 1);
+    xTaskCreatePinnedToCore(business_logic_task, "business_logic_task", 4096, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(anomaly_detection_task, "anomaly_detection", 4096, NULL, 8, NULL, 1);
 }

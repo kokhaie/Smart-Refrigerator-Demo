@@ -141,19 +141,19 @@ void sensor_manager_init(void)
     ESP_ERROR_CHECK(i2c_master_transmit(mpu6050_handle, mpu_wake_cmd, sizeof(mpu_wake_cmd), -1));
     sensor_manager_calibrate_mpu6050();
 
-    // // Add INA226 and Calibrate
-    // dev_config.device_address = INA226_DEVICE_ADDRESS;
-    // ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &ina226_handle));
-    // ina226_current_lsb = MAX_EXPECTED_CURRENT_AMPS / 32768.0;
-    // uint16_t cal = (uint16_t)(0.00512 / (ina226_current_lsb * SHUNT_RESISTANCE_OHMS));
-    // uint8_t ina_cal_cmd[3] = {INA226_REG_CALIBRATION, (cal >> 8) & 0xFF, cal & 0xFF};
-    // ESP_ERROR_CHECK(i2c_master_transmit(ina226_handle, ina_cal_cmd, sizeof(ina_cal_cmd), -1));
-    // uint8_t ina_config_cmd[3] = {INA226_REG_CONFIG, (INA226_DEFAULT_CONFIG >> 8) & 0xFF, INA226_DEFAULT_CONFIG & 0xFF};
-    // ESP_ERROR_CHECK(i2c_master_transmit(ina226_handle, ina_config_cmd, sizeof(ina_config_cmd), -1));
+    // Add INA226 and Calibrate
+    dev_config.device_address = INA226_DEVICE_ADDRESS;
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &ina226_handle));
+    ina226_current_lsb = MAX_EXPECTED_CURRENT_AMPS / 32768.0;
+    uint16_t cal = (uint16_t)(0.00512 / (ina226_current_lsb * SHUNT_RESISTANCE_OHMS));
+    uint8_t ina_cal_cmd[3] = {INA226_REG_CALIBRATION, (cal >> 8) & 0xFF, cal & 0xFF};
+    ESP_ERROR_CHECK(i2c_master_transmit(ina226_handle, ina_cal_cmd, sizeof(ina_cal_cmd), -1));
+    uint8_t ina_config_cmd[3] = {INA226_REG_CONFIG, (INA226_DEFAULT_CONFIG >> 8) & 0xFF, INA226_DEFAULT_CONFIG & 0xFF};
+    ESP_ERROR_CHECK(i2c_master_transmit(ina226_handle, ina_config_cmd, sizeof(ina_config_cmd), -1));
 
-    // // Add SHTC3
-    // dev_config.device_address = SHTC3_SENSOR_ADDR;
-    // ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &shtc3_handle));
+    // Add SHTC3
+    dev_config.device_address = SHTC3_SENSOR_ADDR;
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &shtc3_handle));
 
     ESP_LOGI(TAG, "All sensors initialized!");
 }

@@ -6,7 +6,7 @@
 /**
  * @brief Initializes the LEDC peripheral for motor control.
  */
-void motors_init();
+void motors_init(void);
 
 /**
  * @brief Sets the fan speed.
@@ -27,6 +27,4 @@ void set_vibration_speed(uint8_t percentage);
  *
  * @param percentage The desired speed from 0 to 100.
  */
-void set_fan_speed_with_kickstart(uint8_t percentage);
-
 #endif // MOTORS_H

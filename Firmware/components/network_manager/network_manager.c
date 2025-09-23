@@ -205,7 +205,7 @@ void wifi_init_sta(void)
     }
 }
 
-void network_manager_start(void)
+void network_manager_init(void)
 {
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();

@@ -12,7 +12,7 @@ extern "C" {
  * and upon successful connection, initializes and connects the MQTT client
  * to the specified broker.
  */
-void network_manager_start(void);
+void network_manager_init(void);
 
 #ifdef __cplusplus
 }

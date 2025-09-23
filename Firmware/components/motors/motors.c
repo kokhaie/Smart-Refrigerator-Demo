@@ -4,7 +4,7 @@
 #include "sdkconfig.h" 
 // Define the LEDC timer and channel configurations
 #define LEDC_MODE              LEDC_LOW_SPEED_MODE
-#define LEDC_DUTY_RES          LEDC_TIMER_10_BIT 
+#define LEDC_DUTY_RES          LEDC_TIMER_8_BIT 
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -16,7 +16,7 @@
 #define LEDC_CHANNEL_VIBRATION LEDC_CHANNEL_1
 
 // Calculate the maximum duty cycle value based on the resolution
-#define LEDC_MAX_DUTY ((1 << 13) - 1)
+#define LEDC_MAX_DUTY ((1 << 8) - 1)
 static const char *TAG = "MOTORS";
 
 void motors_init() {
@@ -69,15 +69,6 @@ void motors_init() {
     ESP_LOGI(TAG, "Vibration pin: %d, Freq: %d Hz", CONFIG_VIBRATION_PIN, CONFIG_VIBRATION_LEDC_FREQUENCY);
 }
 
-void set_fan_speed(uint8_t percentage) {
-    // if (percentage > 100) {
-    //     percentage = 100;
-    // }
-    // uint32_t duty = (LEDC_MAX_DUTY * percentage) / 100;
-    ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_FAN, percentage));
-    ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_FAN));
-}
-
 void set_vibration_speed(uint8_t percentage) {
     if (percentage > 100) {
         percentage = 100;
@@ -86,7 +77,7 @@ void set_vibration_speed(uint8_t percentage) {
     ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_VIBRATION, duty));
     ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_VIBRATION));
 }
-void set_fan_speed_with_kickstart(uint8_t percentage) {
+void set_fan_speed(uint8_t percentage) {
     if (percentage > 100) {
         percentage = 100;
     }

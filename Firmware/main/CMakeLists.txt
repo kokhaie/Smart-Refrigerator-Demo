@@ -5,4 +5,4 @@ set(COMPONENT_ADD_INCLUDEDIRS "${main_dir}")
 
 idf_component_register(SRCS ${COMPONENT_SRCS}
                        INCLUDE_DIRS ${COMPONENT_ADD_INCLUDEDIRS}
-                       REQUIRES network_manager sensor_manager ui_manager touch_slider)
+                    REQUIRES network_manager sensor_manager motors touch_slider ui_manager business_logic)
