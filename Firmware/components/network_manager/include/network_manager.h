@@ -9,7 +9,7 @@
  * and upon successful connection, initializes and connects the MQTT client
  * to the specified broker.
  */
-void network_manager_init(void);
+void network_manager_start(void);
 /**
  * @brief Publishes an MQTT message to a specific topic.
  *

@@ -2039,6 +2039,13 @@ CONFIG_LCD_PIN_TE=42
 # end of TFT Display & UI Configuration
 
 #
+# Mosquitto
+#
+CONFIG_MOSQ_IS_ENABLED=y
+# CONFIG_MOSQ_ENABLE_SYS is not set
+# end of Mosquitto
+
+#
 # LVGL configuration
 #
 CONFIG_LV_CONF_SKIP=y

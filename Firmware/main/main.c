@@ -2,7 +2,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-
+#include "nvs_flash.h"
 #include "network_manager.h"
 #include "sensor_manager.h"
 #include "business_logic.h"
@@ -93,7 +93,14 @@ void anomaly_detection_task(void *pvParameters) {}
 
 void app_main(void)
 {
-    network_manager_init();
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+    network_manager_start();
     sensor_manager_init();
     touch_slider_init();
     motors_init();
@@ -141,3 +148,4 @@ void app_main(void)
     xTaskCreatePinnedToCore(business_logic_task, "business_logic_task", 4096, NULL, 10, NULL, 1);
     xTaskCreatePinnedToCore(anomaly_detection_task, "anomaly_detection", 4096, NULL, 8, NULL, 1);
 }
+
