@@ -8,6 +8,7 @@
 #include "business_logic.h"
 #include "touch_slider.h"
 #include "motors.h"
+#include "data_publisher.h"
 
 static const char *TAG = "MAIN_APP";
 
@@ -23,6 +24,7 @@ void sensor_manager_task(void *pvParameters)
         if (sensor_manager_read_ina226(&power_data) == ESP_OK)
         {
             ESP_LOGI(TAG, "INA226 -> Voltage: %.2f V, Current: %.3f A", power_data.bus_voltage_v, power_data.current_a);
+            publish_power_data(&power_data);
         }
         else
         {
@@ -33,6 +35,7 @@ void sensor_manager_task(void *pvParameters)
         {
             ESP_LOGI(TAG, "SHTC3  -> Temp: %.2f C, Humidity: %.1f %%", temp_data.temperature_c, temp_data.humidity_rh);
             update_setpoint(temp_data.temperature_c);
+            publish_environment_data(&temp_data);
         }
         else
         {
@@ -45,6 +48,7 @@ void sensor_manager_task(void *pvParameters)
                      imu_data.accel_x_g, imu_data.accel_y_g, imu_data.accel_z_g,
                      imu_data.gyro_x_dps, imu_data.gyro_y_dps, imu_data.gyro_z_dps,
                      imu_data.pitch, imu_data.roll);
+            publish_motion_data(&imu_data);
         }
         else
         {
@@ -54,10 +58,9 @@ void sensor_manager_task(void *pvParameters)
 }
 void touch_slider_task(void *pvParameters)
 {
-    ESP_LOGI(TAG, "Main application task started.");
-    uint32_t last_position = 999; // Store last position to avoid spamming the log
+    uint8_t last_position = 25;
 
-    while (1)
+    for (;;)
     {
         // --- Handle Events ---
         // First, check if the specific double-touch event occurred.
@@ -69,13 +72,14 @@ void touch_slider_task(void *pvParameters)
 
         // --- Handle State ---
         // Separately, get the current slider position for continuous control.
-        uint32_t current_position = touch_slider_get_position();
+        uint8_t current_position = (uint8_t)touch_slider_get_position();
 
         // Only log if the position has changed to prevent flooding the console
         if (current_position != last_position)
         {
             ESP_LOGI(TAG, "Slider Position: %" PRIu32, current_position);
             last_position = current_position;
+            publish_slider_setpoint(last_position);
             // Add your slider action here (e.g., set brightness)
         }
 

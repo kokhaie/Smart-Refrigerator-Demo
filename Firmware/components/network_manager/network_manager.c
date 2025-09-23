@@ -7,7 +7,6 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
@@ -19,6 +18,7 @@ static const char *TAG = "NETWORK_MANAGER";
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
+static bool s_mqtt_connected = false;
 
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
@@ -51,11 +51,14 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     switch ((esp_mqtt_event_id_t)event_id)
     {
     case MQTT_EVENT_CONNECTED:
+        s_mqtt_connected = true;
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
         msg_id = esp_mqtt_client_subscribe(client, CONFIG_MQTT_TOPIC, 0);
         ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
         break;
     case MQTT_EVENT_DISCONNECTED:
+        s_mqtt_connected = false;
+
         ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
         break;
     case MQTT_EVENT_SUBSCRIBED:
@@ -136,8 +139,30 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+
         mqtt_app_start();
     }
+}
+bool network_manager_publish(const char *topic, const char *payload)
+{
+    if (!s_mqtt_connected)
+    {
+        ESP_LOGE(TAG, "Cannot publish, MQTT client is not connected.");
+        return false;
+    }
+
+    // esp_mqtt_client_publish() returns the message ID on success, or -1 on failure.
+    // len=0 means the library will use strlen(payload). QoS=1 for quality of service. retain=0.
+    int msg_id = esp_mqtt_client_publish(client, topic, payload, 0, 1, 0);
+
+    if (msg_id == -1)
+    {
+        ESP_LOGE(TAG, "Failed to publish message to topic %s", topic);
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Successfully published to topic %s, msg_id=%d", topic, msg_id);
+    return true;
 }
 
 void wifi_init_sta(void)
