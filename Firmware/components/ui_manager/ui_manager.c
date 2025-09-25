@@ -5,6 +5,7 @@
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
 #include "driver/gpio.h"
+#include "esp_lcd_io_i80.h"
 #include "lvgl.h"
 #include "sdkconfig.h"
 #include <sys/lock.h>
@@ -13,6 +14,10 @@
 // #include "ui.h" // <-- You will uncomment this later
 
 static const char *TAG = "UI_Manager";
+
+#define LCD_CMD_BITS 8
+#define LCD_PARAM_BITS 8
+#define DMA_BURST_SIZE 64 // 16, 32, 64. Higher burst size can improve the performance when the DMA buffer comes from PSRAM
 
 // --- LVGL Porting ---
 static _lock_t lvgl_api_lock;
@@ -37,11 +42,16 @@ static void lvgl_flush_cb(lv_display_t *display, const lv_area_t *area, uint8_t 
     int offsetx2 = area->x2;
     int offsety1 = area->y1;
     int offsety2 = area->y2;
+
+    // because LCD is big-endian, we need to swap the RGB bytes order
+    lv_draw_sw_rgb565_swap(color_map, (offsetx2 + 1 - offsetx1) * (offsety2 + 1 - offsety1));
+    // copy a buffer's content to a specific area of the display
     esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, color_map);
 }
 
 static void increase_lvgl_tick(void *arg)
 {
+    /* Tell LVGL how many milliseconds has elapsed */
     lv_tick_inc(LVGL_TICK_PERIOD_MS);
 }
 
@@ -54,10 +64,13 @@ static void lvgl_port_task(void *arg)
         _lock_acquire(&lvgl_api_lock);
         time_till_next_ms = lv_timer_handler();
         _lock_release(&lvgl_api_lock);
+        // in case of triggering a task watch dog time out
+        time_till_next_ms = MAX(time_till_next_ms, LVGL_TASK_MIN_DELAY_MS);
+        // in case of lvgl display not ready yet
+        time_till_next_ms = MIN(time_till_next_ms, LVGL_TASK_MAX_DELAY_MS);
         vTaskDelay(pdMS_TO_TICKS(time_till_next_ms));
     }
 }
-
 
 void ui_manager_start(void)
 {
@@ -66,6 +79,7 @@ void ui_manager_start(void)
     // --- 1. Initialize Display Hardware ---
     esp_lcd_i80_bus_handle_t i80_bus = NULL;
     esp_lcd_i80_bus_config_t bus_config = {
+        .clk_src = LCD_CLK_SRC_DEFAULT,
         .dc_gpio_num = CONFIG_LCD_PIN_DC,
         .wr_gpio_num = CONFIG_LCD_PIN_WR,
         .data_gpio_nums = {
@@ -80,6 +94,8 @@ void ui_manager_start(void)
         },
         .bus_width = 8,
         .max_transfer_bytes = CONFIG_LCD_H_RES * 100 * sizeof(uint16_t),
+        .dma_burst_size = DMA_BURST_SIZE,
+
     };
     ESP_ERROR_CHECK(esp_lcd_new_i80_bus(&bus_config, &i80_bus));
 
@@ -88,46 +104,90 @@ void ui_manager_start(void)
         .cs_gpio_num = CONFIG_LCD_PIN_CS,
         .pclk_hz = CONFIG_LCD_PIXEL_CLOCK_HZ,
         .trans_queue_depth = 10,
+        .dc_levels = {
+            .dc_idle_level = 0,
+            .dc_cmd_level = 0,
+            .dc_dummy_level = 0,
+            .dc_data_level = 1,
+        },
+        .lcd_cmd_bits = LCD_CMD_BITS,
+        .lcd_param_bits = LCD_PARAM_BITS,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_i80(i80_bus, &io_config, &io_handle));
 
     esp_lcd_panel_dev_config_t panel_config = {
         .reset_gpio_num = CONFIG_LCD_PIN_RST,
-        .rgb_endian = LCD_RGB_ENDIAN_RGB,
+        .rgb_endian = LCD_RGB_ELEMENT_ORDER_RGB,
         .bits_per_pixel = 16,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle));
+
     esp_lcd_panel_reset(panel_handle);
     esp_lcd_panel_init(panel_handle);
-    esp_lcd_panel_disp_on_off(panel_handle, true);
+    // Set inversion, x/y coordinate order, x/y mirror according to your LCD module spec
+    // the gap is LCD panel specific, even panels with the same driver IC, can have different gap value
+    esp_lcd_panel_invert_color(panel_handle, true);
+    esp_lcd_panel_set_gap(panel_handle, 0, 20);
 
     // --- 2. Initialize LVGL ---
+    ESP_LOGI(TAG, "Initialize LVGL library");
     lv_init();
     lv_display_t *display = lv_display_create(CONFIG_LCD_H_RES, CONFIG_LCD_V_RES);
+
+    // it's recommended to choose the size of the draw buffer(s) to be at least 1/10 screen sized
     size_t draw_buffer_sz = CONFIG_LCD_H_RES * 50 * sizeof(uint16_t);
-    void *buf1 = malloc(draw_buffer_sz);
-    void *buf2 = malloc(draw_buffer_sz);
+
+    // alloc draw buffers used by LVGL
+    uint32_t draw_buf_alloc_caps = 0;
+
+    // #if CONFIG_EXAMPLE_LCD_I80_COLOR_IN_PSRAM
+    // draw_buf_alloc_caps |= MALLOC_CAP_SPIRAM;
+
+    void *buf1 = esp_lcd_i80_alloc_draw_buffer(io_handle, draw_buffer_sz, draw_buf_alloc_caps);
+    void *buf2 = esp_lcd_i80_alloc_draw_buffer(io_handle, draw_buffer_sz, draw_buf_alloc_caps);
+    assert(buf1);
+    assert(buf2);
+    ESP_LOGI(TAG, "buf1@%p, buf2@%p", buf1, buf2);
+
+    // initialize LVGL draw buffers
     lv_display_set_buffers(display, buf1, buf2, draw_buffer_sz, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    // associate the mipi panel handle to the display
     lv_display_set_user_data(display, panel_handle);
+    // set color depth
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    // set the callback which can copy the rendered image to an area of the display
     lv_display_set_flush_cb(display, lvgl_flush_cb);
-    const esp_lcd_panel_io_callbacks_t cbs = {.on_color_trans_done = notify_lvgl_flush_ready};
-    esp_lcd_panel_io_register_event_callbacks(io_handle, &cbs, display);
 
     // // --- 3. Initialize LVGL Input Device (Keypad) ---
     // lv_indev_t *indev = lv_indev_create();
     // lv_indev_set_type(indev, LV_INDEV_TYPE_KEYPAD);
 
     // --- 4. Start LVGL Timers and Tasks ---
-    const esp_timer_create_args_t lvgl_tick_timer_args = {.callback = &increase_lvgl_tick, .name = "lvgl_tick"};
+    ESP_LOGI(TAG, "Install LVGL tick timer");
+    const esp_timer_create_args_t lvgl_tick_timer_args = {
+        .callback = &increase_lvgl_tick,
+        .name = "lvgl_tick"};
     esp_timer_handle_t lvgl_tick_timer = NULL;
     ESP_ERROR_CHECK(esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer));
     ESP_ERROR_CHECK(esp_timer_start_periodic(lvgl_tick_timer, LVGL_TICK_PERIOD_MS * 1000));
-    xTaskCreate(lvgl_port_task, "LVGL_Task", LVGL_TASK_STACK_SIZE, NULL, LVGL_TASK_PRIORITY, NULL);
+
+    ESP_LOGI(TAG, "Register io panel event callback for LVGL flush ready notification");
+    const esp_lcd_panel_io_callbacks_t cbs = {
+        .on_color_trans_done = notify_lvgl_flush_ready,
+    };
+
+    /* Register done callback */
+    ESP_ERROR_CHECK(esp_lcd_panel_io_register_event_callbacks(io_handle, &cbs, display));
+    ESP_LOGI(TAG, "Create LVGL task");
+
+    xTaskCreatePinnedToCore(lvgl_port_task, "LVGL_Task", LVGL_TASK_STACK_SIZE, NULL, LVGL_TASK_PRIORITY, NULL, 0);
 
     // --- 5. Load the UI ---
     _lock_acquire(&lvgl_api_lock);
+
     // Here you will call the UI function generated by SquareLine Studio
     // For example:
     // ui_init();
+
     _lock_release(&lvgl_api_lock);
 }
