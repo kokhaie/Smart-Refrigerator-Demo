@@ -10,8 +10,8 @@
 #include "freertos/task.h"
 
 // Timer and Channel assignments
-#define LEDC_TIMER_FAN         LEDC_TIMER_0
-#define LEDC_TIMER_VIBRATION   LEDC_TIMER_1
+#define LEDC_TIMER_FAN         LEDC_TIMER_2
+#define LEDC_TIMER_VIBRATION   LEDC_TIMER_3
 #define LEDC_CHANNEL_FAN       LEDC_CHANNEL_0
 #define LEDC_CHANNEL_VIBRATION LEDC_CHANNEL_1
 

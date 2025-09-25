@@ -20,6 +20,12 @@
     "motors.h": "c",
     "esp_log.h": "c",
     "queue.h": "c",
-    "network_manager.h": "c"
-  }
+    "network_manager.h": "c",
+    "mqtt_client.h": "c",
+    "mosquitto.h": "c",
+    "stdbool.h": "c",
+    "inet.h": "c"
+  },
+  "idf.monitorPort": "/dev/ttyACM0",
+  "idf.port": "/dev/ttyACM0"
 }

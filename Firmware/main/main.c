@@ -21,26 +21,26 @@ void sensor_manager_task(void *pvParameters)
 
     for (;;)
     {
-        if (sensor_manager_read_ina226(&power_data) == ESP_OK)
-        {
-            ESP_LOGI(TAG, "INA226 -> Voltage: %.2f V, Current: %.3f A", power_data.bus_voltage_v, power_data.current_a);
-            publish_power_data(&power_data);
-        }
-        else
-        {
-            ESP_LOGE(TAG, "Failed to read INA226");
-        }
+        // if (sensor_manager_read_ina226(&power_data) == ESP_OK)
+        // {
+        //     ESP_LOGI(TAG, "INA226 -> Voltage: %.2f V, Current: %.3f A", power_data.bus_voltage_v, power_data.current_a);
+        //     publish_power_data(&power_data);
+        // }
+        // else
+        // {
+        //     ESP_LOGE(TAG, "Failed to read INA226");
+        // }
 
-        if (sensor_manager_read_shtc3(&temp_data) == ESP_OK)
-        {
-            ESP_LOGI(TAG, "SHTC3  -> Temp: %.2f C, Humidity: %.1f %%", temp_data.temperature_c, temp_data.humidity_rh);
-            update_setpoint(temp_data.temperature_c);
-            publish_environment_data(&temp_data);
-        }
-        else
-        {
-            ESP_LOGE(TAG, "Failed to read SHTC3");
-        }
+        // if (sensor_manager_read_shtc3(&temp_data) == ESP_OK)
+        // {
+        //     ESP_LOGI(TAG, "SHTC3  -> Temp: %.2f C, Humidity: %.1f %%", temp_data.temperature_c, temp_data.humidity_rh);
+        //     update_setpoint(temp_data.temperature_c);
+        //     publish_environment_data(&temp_data);
+        // }
+        // else
+        // {
+        //     ESP_LOGE(TAG, "Failed to read SHTC3");
+        // }
 
         if (sensor_manager_read_mpu6050(&imu_data) == ESP_OK)
         {
@@ -54,6 +54,7 @@ void sensor_manager_task(void *pvParameters)
         {
             ESP_LOGE(TAG, "Failed to read MPU6050");
         }
+        vTaskDelay(pdTICKS_TO_MS(100));
     }
 }
 void touch_slider_task(void *pvParameters)
@@ -90,22 +91,8 @@ void ui_manager_task(void *pvParameters) {}
 void network_manager_task(void *pvParameters) {}
 void business_logic_task(void *pvParameters) {}
 void anomaly_detection_task(void *pvParameters) {}
-
-void app_main(void)
+void start_tasks(void)
 {
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-    network_manager_start();
-    sensor_manager_init();
-    touch_slider_init();
-    motors_init();
-    //  ui manager init
-
     /*
      * =================================================================
      * ESP32-S3 R8N8 Dual-Core Task Assignment Plan
@@ -140,12 +127,73 @@ void app_main(void)
      * =================================================================
      */
 
-    xTaskCreatePinnedToCore(touch_slider_task, "touch_slider_task", 4096, NULL, 12, NULL, 0);
-    xTaskCreatePinnedToCore(network_manager_task, "network_manager_task", 4096, NULL, 10, NULL, 0);
-    xTaskCreatePinnedToCore(ui_manager_task, "ui_manager_task", 4096, NULL, 8, NULL, 0);
+     
+    // xTaskCreatePinnedToCore(touch_slider_task, "touch_slider_task", 4096, NULL, 12, NULL, 0);
+    // xTaskCreatePinnedToCore(network_manager_task, "network_manager_task", 4096, NULL, 10, NULL, 0);
+    // xTaskCreatePinnedToCore(ui_manager_task, "ui_manager_task", 4096, NULL, 8, NULL, 0);
 
     xTaskCreatePinnedToCore(sensor_manager_task, "sensor_manager_task", 4096, NULL, 12, NULL, 1);
-    xTaskCreatePinnedToCore(business_logic_task, "business_logic_task", 4096, NULL, 10, NULL, 1);
-    xTaskCreatePinnedToCore(anomaly_detection_task, "anomaly_detection", 4096, NULL, 8, NULL, 1);
+    // xTaskCreatePinnedToCore(business_logic_task, "business_logic_task", 4096, NULL, 10, NULL, 1);
+    // xTaskCreatePinnedToCore(anomaly_detection_task, "anomaly_detection", 4096, NULL, 8, NULL, 1);
 }
+void app_status_update_cb(network_status_t status)
+{
+    // Here you would update your LCD based on the status
+    switch (status)
+    {
+    case NETWORK_STATUS_INITIALIZING:
+        ESP_LOGI(TAG, "LCD UPDATE: Initializing...");
+        // lcd_display("Initializing...");
+        break;
+    case NETWORK_STATUS_CONNECTING_WIFI:
+        ESP_LOGI(TAG, "LCD UPDATE: Connecting Wi-Fi...");
+        // lcd_display("Connecting WiFi");
+        break;
+    case NETWORK_STATUS_CONNECTING_MQTT:
+        ESP_LOGI(TAG, "LCD UPDATE: Connecting Broker...");
+        // lcd_display("Connecting Broker");
+        break;
+    case NETWORK_STATUS_CONNECTED_INTERNET:
+        ESP_LOGI(TAG, "LCD UPDATE: Connected!");
+        start_tasks();
+        // mqtt connected
+        // lcd_display("Online!");
 
+        break;
+    case NETWORK_STATUS_CONNECTION_FAILED:
+        ESP_LOGI(TAG, "LCD UPDATE: Connection Failed.");
+        // lcd_display("Connection Failed");
+        break;
+    case NETWORK_STATUS_STARTING_AP_MODE:
+        ESP_LOGI(TAG, "LCD UPDATE: Starting AP Mode...");
+        // lcd_display("Starting AP Mode");
+        break;
+    case NETWORK_STATUS_STARTING_LOCAL_BROKER:
+        ESP_LOGI(TAG, "LCD UPDATE: Starting Broker...");
+        // lcd_display("Starting Broker");
+        break;
+    case NETWORK_STATUS_AP_MODE_ACTIVE:
+        ESP_LOGI(TAG, "LCD UPDATE: AP Active at 192.168.4.1");
+        // lcd_display("AP Active:\n192.168.4.1");
+        break;
+    }
+}
+void app_main(void)
+{
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    // touch_slider_init();
+    // motors_init();
+
+    //  ui manager init
+
+    if (sensor_manager_init() != ESP_OK)
+        ESP_LOGE("MAIN", "Sensor initialization failed. Halting application.");
+    network_manager_start(app_status_update_cb);
+}
