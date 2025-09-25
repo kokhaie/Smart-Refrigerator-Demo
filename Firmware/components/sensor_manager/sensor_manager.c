@@ -116,7 +116,7 @@ static uint8_t shtc3_crc8(const uint8_t *data, int len)
 }
 
 // --- Main Init Function ---
-void sensor_manager_init(void)
+esp_err_t sensor_manager_init(void)
 {
     // Create I2C bus
     i2c_master_bus_config_t i2c_bus_config = {
@@ -127,7 +127,7 @@ void sensor_manager_init(void)
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
     };
-    ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_config, &bus_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_new_master_bus(&i2c_bus_config, &bus_handle));
 
     // Create a generic device config
     i2c_device_config_t dev_config = {
@@ -136,26 +136,50 @@ void sensor_manager_init(void)
 
     // Add MPU6050
     dev_config.device_address = MPU6050_ADDR;
-    ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &mpu6050_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_bus_add_device(bus_handle, &dev_config, &mpu6050_handle));
     uint8_t mpu_wake_cmd[] = {MPU6050_PWR_MGMT_1, 0};
-    ESP_ERROR_CHECK(i2c_master_transmit(mpu6050_handle, mpu_wake_cmd, sizeof(mpu_wake_cmd), -1));
-    sensor_manager_calibrate_mpu6050();
+    if (i2c_master_transmit(mpu6050_handle, mpu_wake_cmd, sizeof(mpu_wake_cmd), -1) != ESP_OK)
+    {
+        ESP_LOGE(TAG, "MPU6050 not found or failed to wake up!");
+        // return ESP_FAIL; // Return an error
+    }
+    // sensor_manager_calibrate_mpu6050();
 
     // // Add INA226 and Calibrate
     // dev_config.device_address = INA226_DEVICE_ADDRESS;
-    // ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &ina226_handle));
+    // ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_bus_add_device(bus_handle, &dev_config, &ina226_handle));
     // ina226_current_lsb = MAX_EXPECTED_CURRENT_AMPS / 32768.0;
     // uint16_t cal = (uint16_t)(0.00512 / (ina226_current_lsb * SHUNT_RESISTANCE_OHMS));
     // uint8_t ina_cal_cmd[3] = {INA226_REG_CALIBRATION, (cal >> 8) & 0xFF, cal & 0xFF};
-    // ESP_ERROR_CHECK(i2c_master_transmit(ina226_handle, ina_cal_cmd, sizeof(ina_cal_cmd), -1));
+
+    // ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_transmit(ina226_handle, ina_cal_cmd, sizeof(ina_cal_cmd), -1));
+    // if (i2c_master_transmit(ina226_handle, ina_cal_cmd, sizeof(ina_cal_cmd), -1) != ESP_OK)
+    // {
+    //     ESP_LOGE(TAG, "INA226 not found or failed to configure!");
+    //     // return ESP_FAIL;
+    // }
     // uint8_t ina_config_cmd[3] = {INA226_REG_CONFIG, (INA226_DEFAULT_CONFIG >> 8) & 0xFF, INA226_DEFAULT_CONFIG & 0xFF};
-    // ESP_ERROR_CHECK(i2c_master_transmit(ina226_handle, ina_config_cmd, sizeof(ina_config_cmd), -1));
+    // if (i2c_master_transmit(ina226_handle, ina_config_cmd, sizeof(ina_config_cmd), -1) != ESP_OK)
+    // {
+    //     ESP_LOGE(TAG, "INA226 not found or failed to configure!");
+    //     // return ESP_FAIL;
+    // }
 
     // // Add SHTC3
     // dev_config.device_address = SHTC3_SENSOR_ADDR;
-    // ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &shtc3_handle));
+    // ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_bus_add_device(bus_handle, &dev_config, &shtc3_handle));
+    // uint8_t shtc3_wake_cmd[] = {(SHTC3_CMD_WAKEUP >> 8) & 0xFF, SHTC3_CMD_WAKEUP & 0xFF};
+    // if (i2c_master_transmit(shtc3_handle, shtc3_wake_cmd, sizeof(shtc3_wake_cmd), -1) != ESP_OK)
+    // {
+    //     ESP_LOGE(TAG, "SHTC3 not found or failed to wake up!");
+    //     return ESP_FAIL;
+    // }
+    // // Send sleep command immediately after check
+    // uint8_t shtc3_sleep_cmd[] = {(SHTC3_CMD_SLEEP >> 8) & 0xFF, SHTC3_CMD_SLEEP & 0xFF};
+    // i2c_master_transmit(shtc3_handle, shtc3_sleep_cmd, sizeof(shtc3_sleep_cmd), -1);
 
     ESP_LOGI(TAG, "All sensors initialized!");
+    return ESP_OK;
 }
 
 // --- Separate Reading Functions ---
@@ -255,7 +279,7 @@ esp_err_t sensor_manager_read_mpu6050(mpu6050_data_t *data)
     // int16_t gyro_x_raw = ((buffer[8] << 8) | buffer[9]) - mpu_offsets.gyro_x;
     // int16_t gyro_y_raw = ((buffer[10] << 8) | buffer[11]) - mpu_offsets.gyro_y;
     // int16_t gyro_z_raw = ((buffer[12] << 8) | buffer[13]) - mpu_offsets.gyro_z;
-    
+
     int16_t accel_x_raw = ((buffer[0] << 8) | buffer[1]);
     int16_t accel_y_raw = ((buffer[2] << 8) | buffer[3]);
     int16_t accel_z_raw = ((buffer[4] << 8) | buffer[5]);

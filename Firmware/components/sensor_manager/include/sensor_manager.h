@@ -31,7 +31,7 @@ typedef struct {
  * @brief Initializes the I2C bus and all connected sensors.
  * This should be called once at application startup.
  */
-void sensor_manager_init(void);
+esp_err_t sensor_manager_init(void);
 
 /**
  * @brief Reads the latest data from the INA226 Power Monitor.

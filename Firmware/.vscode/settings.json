@@ -1,0 +1,31 @@
+{
+  "idf.flashType": "UART",
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ],
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "clangd.path": "/home/mohammadreza/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=/home/mohammadreza/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc",
+    "--compile-commands-dir=/home/mohammadreza/Documents/SmartRefrigratorDemo/Firmware/build"
+  ],
+  "idf.espIdfPath": "/home/mohammadreza/esp/v5.5.1/esp-idf/",
+  "idf.toolsPath": "/home/mohammadreza/.espressif",
+  "idf.pythonInstallPath": "/bin/python3.12",
+  "files.associations": {
+    "sensor_manager.h": "c",
+    "motors.h": "c",
+    "esp_log.h": "c",
+    "queue.h": "c",
+    "network_manager.h": "c",
+    "mqtt_client.h": "c",
+    "mosquitto.h": "c",
+    "stdbool.h": "c",
+    "inet.h": "c"
+  },
+  "idf.monitorPort": "/dev/ttyACM0",
+  "idf.port": "/dev/ttyACM0"
+}

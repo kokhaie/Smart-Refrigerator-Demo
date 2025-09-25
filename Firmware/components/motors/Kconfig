@@ -1,0 +1,29 @@
+menu "Motor Control Configuration"
+
+    config FAN_PIN
+        int "Fan GPIO Pin"
+        default 47
+        help
+            Select the GPIO pin connected to the fan motor driver.
+
+    config FAN_LEDC_FREQUENCY
+        int "Fan PWM Frequency (Hz)"
+        default 5000
+        help
+            Set the PWM frequency for the fan controller.
+            A value around 5000 Hz is typical to avoid audible noise.
+
+    config VIBRATION_PIN
+        int "Vibration Motor GPIO Pin"
+        default 48
+        help
+            Select the GPIO pin connected to the vibration motor driver.
+
+    config VIBRATION_LEDC_FREQUENCY
+        int "Vibration Motor PWM Frequency (Hz)"
+        default 250
+        help
+            Set the PWM frequency for the vibration motor. Lower frequencies can
+            sometimes provide a stronger haptic effect for certain motor types.
+
+endmenu
