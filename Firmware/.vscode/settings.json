@@ -24,7 +24,9 @@
     "mqtt_client.h": "c",
     "mosquitto.h": "c",
     "stdbool.h": "c",
-    "inet.h": "c"
+    "inet.h": "c",
+    "ui.h": "c",
+    "lvgl.h": "c"
   },
   "idf.monitorPort": "/dev/ttyACM0",
   "idf.port": "/dev/ttyACM0"
