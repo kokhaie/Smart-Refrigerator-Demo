@@ -6,6 +6,8 @@ idf_component_register(SRCS
                     "ui_helpers.c"
                     "screens/ui_Screen1.c"
                     "components/ui_comp_hook.c"
+                    "anim/ailogo.c"
+                    "anim/wave.c"
                     "images/ui_img_device_thermostat_48dp_ffffff_fill1_wght400_grad0_opsz48_png.c"
                     "images/ui_img_electric_meter_48dp_ffffff_fill1_wght400_grad0_opsz48_png.c"
                     "images/ui_img_humidity_percentage_48dp_ffffff_fill1_wght400_grad0_opsz48_png.c"
@@ -18,6 +20,7 @@ idf_component_register(SRCS
                     "."        # For top-level headers like ui.h
                     "screens"
                     "components"
+                    "anim"
                     "images"
                     "fonts"
                     # --- Component Dependencies ---
