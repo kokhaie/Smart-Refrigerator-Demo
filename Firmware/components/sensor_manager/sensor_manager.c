@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "sdkconfig.h"
 #include <math.h>
 
 static const char *TAG = "SENSOR_MANAGER";
@@ -13,11 +14,6 @@ static i2c_master_dev_handle_t mpu6050_handle;
 static i2c_master_dev_handle_t ina226_handle;
 static i2c_master_dev_handle_t shtc3_handle;
 static float ina226_current_lsb; // Stores the calculated LSB for INA226
-
-// --- Hardware and Protocol Defines ---
-#define I2C_MASTER_SCL_IO 16
-#define I2C_MASTER_SDA_IO 15
-#define I2C_MASTER_FREQ_HZ 100000
 
 // MPU6050 Defines
 #define MPU6050_ADDR 0x68
@@ -34,8 +30,6 @@ static float ina226_current_lsb; // Stores the calculated LSB for INA226
 #define INA226_REG_CURRENT 0x04
 #define INA226_REG_CALIBRATION 0x05
 #define INA226_DEFAULT_CONFIG 0x4127
-#define SHUNT_RESISTANCE_OHMS 0.1
-#define MAX_EXPECTED_CURRENT_AMPS 3.2
 
 // SHTC3 Defines
 #define SHTC3_SENSOR_ADDR 0x70
@@ -121,8 +115,8 @@ esp_err_t sensor_manager_init(void)
     // Create I2C bus
     i2c_master_bus_config_t i2c_bus_config = {
         .i2c_port = I2C_NUM_0,
-        .sda_io_num = I2C_MASTER_SDA_IO,
-        .scl_io_num = I2C_MASTER_SCL_IO,
+        .sda_io_num = CONFIG_I2C_MASTER_SDA_IO,
+        .scl_io_num = CONFIG_I2C_MASTER_SCL_IO,
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
@@ -131,7 +125,7 @@ esp_err_t sensor_manager_init(void)
 
     // Create a generic device config
     i2c_device_config_t dev_config = {
-        .scl_speed_hz = I2C_MASTER_FREQ_HZ,
+        .scl_speed_hz = CONFIG_I2C_MASTER_FREQ_HZ,
     };
 
     // Add MPU6050
@@ -148,8 +142,8 @@ esp_err_t sensor_manager_init(void)
     // Add INA226 and Calibrate
     dev_config.device_address = INA226_DEVICE_ADDRESS;
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_bus_add_device(bus_handle, &dev_config, &ina226_handle));
-    ina226_current_lsb = MAX_EXPECTED_CURRENT_AMPS / 32768.0;
-    uint16_t cal = (uint16_t)(0.00512 / (ina226_current_lsb * SHUNT_RESISTANCE_OHMS));
+    ina226_current_lsb = CONFIG_INA226_MAX_CURRENT_MILLIAMPS / 32768.0;
+    uint16_t cal = (uint16_t)(0.00512 / (ina226_current_lsb * CONFIG_INA226_SHUNT_RESISTANCE_MILLIOHMS));
     uint8_t ina_cal_cmd[3] = {INA226_REG_CALIBRATION, (cal >> 8) & 0xFF, cal & 0xFF};
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_transmit(ina226_handle, ina_cal_cmd, sizeof(ina_cal_cmd), -1));

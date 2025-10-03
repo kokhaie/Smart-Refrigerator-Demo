@@ -1,0 +1,67 @@
+menu "Sensor Manager Configuration"
+
+    config I2C_MASTER_SDA_IO
+        int "I2C Master SDA GPIO Pin"
+        default 15
+        help
+            GPIO pin to use for I2C SDA line.
+
+    config I2C_MASTER_SCL_IO
+        int "I2C Master SCL GPIO Pin"
+        default 16
+        help
+            GPIO pin to use for I2C SCL line.
+
+    config I2C_MASTER_FREQ_HZ
+        int "I2C Master Clock Speed (Hz)"
+        default 400000
+        help
+            I2C clock frequency. 400000 for Fast Mode is recommended.
+
+    menu "MPU6050 Accelerometer/Gyro"
+        config ENABLE_MPU6050
+            bool "Enable MPU6050 Sensor"
+            default y
+            help
+                Enable this to include the MPU6050 driver.
+
+        config MPU6050_CALIBRATE_ON_START
+            bool "Calibrate MPU6050 on Startup"
+            depends on ENABLE_MPU6050
+            default n
+            help
+                If enabled, the MPU6050 will perform a calibration routine at startup.
+                The device must be kept flat and still during this time.
+    endmenu
+
+    menu "INA226 Current/Voltage Sensor"
+        config ENABLE_INA226
+            bool "Enable INA226 Sensor"
+            default y
+            help
+                Enable this to include the INA226 driver.
+
+        config INA226_SHUNT_RESISTANCE_MILLIOHMS
+            int "Shunt Resistor Value (in milli-Ohms)"
+            depends on ENABLE_INA226
+            default 100
+            help
+                The value of the shunt resistor in milli-Ohms (e.g., enter 100 for 0.1 Ohms).
+
+        config INA226_MAX_CURRENT_MILLIAMPS
+            int "Max Expected Current (in milli-Amps)"
+            depends on ENABLE_INA226
+            default 3200
+            help
+                The maximum current you expect to measure in milli-Amps (e.g., enter 3200 for 3.2 Amps).
+    endmenu
+
+    menu "SHTC3 Temperature/Humidity Sensor"
+        config ENABLE_SHTC3
+            bool "Enable SHTC3 Sensor"
+            default y
+            help
+                Enable this to include the SHTC3 driver.
+    endmenu
+
+endmenu

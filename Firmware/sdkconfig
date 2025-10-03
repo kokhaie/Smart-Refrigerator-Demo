@@ -1996,6 +1996,35 @@ CONFIG_MQTT_PASSWORD="xez9vEHNYrhcsYu"
 # end of Network Manager Configuration
 
 #
+# Sensor Manager Configuration
+#
+CONFIG_I2C_MASTER_SDA_IO=15
+CONFIG_I2C_MASTER_SCL_IO=16
+CONFIG_I2C_MASTER_FREQ_HZ=400000
+
+#
+# MPU6050 Accelerometer/Gyro
+#
+CONFIG_ENABLE_MPU6050=y
+# CONFIG_MPU6050_CALIBRATE_ON_START is not set
+# end of MPU6050 Accelerometer/Gyro
+
+#
+# INA226 Current/Voltage Sensor
+#
+CONFIG_ENABLE_INA226=y
+CONFIG_INA226_SHUNT_RESISTANCE_MILLIOHMS=100
+CONFIG_INA226_MAX_CURRENT_MILLIAMPS=3200
+# end of INA226 Current/Voltage Sensor
+
+#
+# SHTC3 Temperature/Humidity Sensor
+#
+CONFIG_ENABLE_SHTC3=y
+# end of SHTC3 Temperature/Humidity Sensor
+# end of Sensor Manager Configuration
+
+#
 # Touch Slider Config
 #
 CONFIG_TOUCH_SLIDER_PAD1_CHANNEL=1
