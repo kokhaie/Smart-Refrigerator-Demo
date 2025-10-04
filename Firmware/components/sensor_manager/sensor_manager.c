@@ -97,7 +97,6 @@ static esp_err_t mpu6050_fifo_init(i2c_master_dev_handle_t dev_handle)
     return ESP_OK;
 }
 
-
 static esp_err_t do_read_ina226(ina226_data_t *data)
 {
     uint8_t read_buf[2];
@@ -193,7 +192,6 @@ static void mpu_task(void *pvParameters)
 
     for (;;)
     {
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
         mpu6050_data_t current_mpu_data = {0};
         bool data_was_processed = false;
@@ -248,6 +246,7 @@ static void mpu_task(void *pvParameters)
                 xSemaphoreGive(data_mutex);
             }
         }
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
 
@@ -256,7 +255,6 @@ static void ina_task(void *pvParameters)
     ina226_data_t temp_data;
     for (;;)
     {
-        vTaskDelay(pdMS_TO_TICKS(100)); // Run every 100ms
         if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(200)) == pdTRUE)
         {
             if (do_read_ina226(&temp_data) == ESP_OK)
@@ -269,6 +267,7 @@ static void ina_task(void *pvParameters)
             }
             xSemaphoreGive(i2c_mutex);
         }
+        vTaskDelay(pdMS_TO_TICKS(100)); // Run every 100ms
     }
 }
 
@@ -277,8 +276,6 @@ static void shtc_task(void *pvParameters)
     shtc3_data_t temp_data;
     for (;;)
     {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-
         if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(200)) == pdTRUE)
         {
 
@@ -297,6 +294,7 @@ static void shtc_task(void *pvParameters)
             // This will tell us if the task is failing to get the mutex
             ESP_LOGE(TAG, "SHTC3 task could not get I2C mutex lock.");
         }
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -356,19 +354,19 @@ esp_err_t sensor_manager_init(void)
     ESP_ERROR_CHECK(i2c_master_transmit(mpu6050_handle, mpu_wake_cmd, sizeof(mpu_wake_cmd), -1));
     ESP_ERROR_CHECK(mpu6050_fifo_init(mpu6050_handle));
 
- // Init INA226
+    // Init INA226
     dev_config.device_address = INA226_DEVICE_ADDRESS;
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &ina226_handle));
 
     // --- Convert all values to base units (Amps and Ohms) before calculating ---
 
     // 1. Get your configured values from sdkconfig
-    const float max_expected_current_mA = CONFIG_INA226_MAX_CURRENT_MILLIAMPS;     // This will be 500.0
+    const float max_expected_current_mA = CONFIG_INA226_MAX_CURRENT_MILLIAMPS;    // This will be 500.0
     const float shunt_resistance_mOhm = CONFIG_INA226_SHUNT_RESISTANCE_MILLIOHMS; // This should be 100.0 for a 0.1 Ohm resistor
 
     // 2. Convert to Amps and Ohms
     float max_expected_current_A = max_expected_current_mA / 1000.0; // 500mA -> 0.5A
-    float shunt_resistance_Ohm = shunt_resistance_mOhm / 1000.0;   // 100mOhm -> 0.1 Ohm
+    float shunt_resistance_Ohm = shunt_resistance_mOhm / 1000.0;     // 100mOhm -> 0.1 Ohm
 
     // 3. Calculate Current_LSB in Amps per bit. This will be stored for later.
     ina226_current_lsb = max_expected_current_A / 32768.0;
@@ -387,7 +385,6 @@ esp_err_t sensor_manager_init(void)
     uint8_t ina_config_cmd[3] = {INA226_REG_CONFIG, (INA226_DEFAULT_CONFIG >> 8) & 0xFF, INA226_DEFAULT_CONFIG & 0xFF};
     ESP_ERROR_CHECK(i2c_master_transmit(ina226_handle, ina_config_cmd, sizeof(ina_config_cmd), -1));
 
-    
     // Init SHTC3
     dev_config.device_address = SHTC3_SENSOR_ADDR;
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &shtc3_handle));
