@@ -24,37 +24,42 @@ typedef struct {
     float pitch, roll;
 } mpu6050_data_t;
 
-
-// --- Public Functions ---
+typedef struct
+{
+    int32_t accel_x;
+    int32_t accel_y;
+    int32_t accel_z;
+    int32_t gyro_x;
+    int32_t gyro_y;
+    int32_t gyro_z;
+} mpu6050_offsets_t;
 
 /**
- * @brief Initializes the I2C bus and all connected sensors.
- * This should be called once at application startup.
+ * @brief Initializes the I2C bus and all sensors, and starts the background reading tasks.
+ * * @return esp_err_t ESP_OK on success, otherwise an error code.
  */
 esp_err_t sensor_manager_init(void);
 
 /**
- * @brief Reads the latest data from the INA226 Power Monitor.
- *
- * @param data Pointer to a struct to store the reading.
- * @return ESP_OK on success, or an error code on failure.
+ * @brief Thread-safely gets the latest data from the MPU6050 sensor.
+ * * @param data Pointer to a struct where the data will be copied.
+ * @return esp_err_t ESP_OK on success, ESP_FAIL if the data could not be retrieved.
  */
-esp_err_t sensor_manager_read_ina226(ina226_data_t *data);
+esp_err_t sensor_manager_get_latest_mpu6050_data(mpu6050_data_t *data);
 
 /**
- * @brief Reads the latest data from the SHTC3 Temp/Humidity Sensor.
- *
- * @param data Pointer to a struct to store the reading.
- * @return ESP_OK on success, or an error code on failure.
+ * @brief Thread-safely gets the latest data from the INA226 sensor.
+ * * @param data Pointer to a struct where the data will be copied.
+ * @return esp_err_t ESP_OK on success, ESP_FAIL if the data could not be retrieved.
  */
-esp_err_t sensor_manager_read_shtc3(shtc3_data_t *data);
+esp_err_t sensor_manager_get_latest_ina226_data(ina226_data_t *data);
 
 /**
- * @brief Reads the latest data from the MPU6050 IMU.
- *
- * @param data Pointer to a struct to store the reading.
- * @return ESP_OK on success, or an error code on failure.
+ * @brief Thread-safely gets the latest data from the SHTC3 sensor.
+ * * @param data Pointer to a struct where the data will be copied.
+ * @return esp_err_t ESP_OK on success, ESP_FAIL if the data could not be retrieved.
  */
-esp_err_t sensor_manager_read_mpu6050(mpu6050_data_t *data);
+esp_err_t sensor_manager_get_latest_shtc3_data(shtc3_data_t *data);
 
-#endif
+
+#endif // SENSOR_MANAGER_H
