@@ -27,8 +27,9 @@
     "inet.h": "c",
     "ui.h": "c",
     "lvgl.h": "c",
-    "lv_lottie.h": "c"
+    "lv_lottie.h": "c",
+    "ui_screen1.h": "c"
   },
-  "idf.monitorPort": "/dev/ttyACM0",
-  "idf.port": "/dev/ttyACM0"
+  "idf.monitorPort": "/dev/ttyUSB0",
+  "idf.port": "/dev/ttyUSB0"
 }

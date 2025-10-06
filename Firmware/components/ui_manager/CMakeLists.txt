@@ -5,6 +5,7 @@ idf_component_register(SRCS
                     "ui.c"
                     "ui_helpers.c"
                     "screens/ui_Screen1.c"
+                    "screens/splash_screen.c"
                     "components/ui_comp_hook.c"
                     "anim/ailogo.c"
                     "anim/wave.c"

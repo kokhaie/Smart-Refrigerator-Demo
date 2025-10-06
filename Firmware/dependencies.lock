@@ -38,6 +38,6 @@ direct_dependencies:
 - espressif/mosquitto
 - idf
 - lvgl/lvgl
-manifest_hash: 2a4db10fb65a2436567a59837637231d83cfe503dcad8b06dee501511c1543df
+manifest_hash: 686ed638266788b303ced3919e6c5d981f05396f04f90121a25c73e0aa7d0707
 target: esp32s3
 version: 2.0.0

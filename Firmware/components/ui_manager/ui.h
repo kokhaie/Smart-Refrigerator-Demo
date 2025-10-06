@@ -17,6 +17,7 @@ extern "C" {
 
 ///////////////////// SCREENS ////////////////////
 #include "screens/ui_Screen1.h"
+#include "screens/splash_screen.h"
 
 ///////////////////// VARIABLES ////////////////////
 
