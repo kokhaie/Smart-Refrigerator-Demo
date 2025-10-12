@@ -6,7 +6,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-#include "math.h"
+#include <math.h>
+#include <string.h>
 
 static const char *TAG = "SENSOR_MANAGER";
 
@@ -16,7 +17,6 @@ static const char *TAG = "SENSOR_MANAGER";
 #define REG_USER_CTRL 0x6A
 #define REG_FIFO_EN 0x23
 #define REG_INT_ENABLE 0x38
-#define REG_INT_STATUS 0x3A
 #define REG_SMPLRT_DIV 0x19
 #define REG_CONFIG 0x1A
 #define REG_ACCEL_CONFIG 0x1C
@@ -55,18 +55,23 @@ static i2c_master_dev_handle_t mpu_dev, ina_dev, shtc_dev;
 static SemaphoreHandle_t i2c_mutex;
 static SemaphoreHandle_t data_mutex;
 static SemaphoreHandle_t mpu_sem;
-static QueueHandle_t data_queue;
 
 static float ina226_current_lsb;
 static volatile ina226_data_t latest_ina = {0};
 static volatile shtc3_data_t latest_shtc = {0};
 
-// ------------------------- Data Queue -------------------------
-#define BATCH_SIZE 1000
-#define QUEUE_LEN 200
-static synchronized_sample_t batch_buf[BATCH_SIZE];
+// ------------------------- Queues -------------------------
+#define STREAM_QUEUE_LEN 5 // for MQTT/real-time graph
+#define BATCH_QUEUE_LEN 4   // number of batches buffered
 
-// ------------------------- I2C Helpers (with mutex) -------------------------
+static QueueHandle_t stream_queue;
+static QueueHandle_t batch_queue;
+
+static synchronized_sample_t batch_buf[BATCH_SIZE];
+static int batch_index = 0;
+static int downsample_counter = 0;
+
+// ------------------------- I2C Helpers -------------------------
 static esp_err_t i2c_write(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t val)
 {
     esp_err_t ret = ESP_FAIL;
@@ -123,7 +128,7 @@ static void IRAM_ATTR mpu_isr(void *arg)
         portYIELD_FROM_ISR();
 }
 
-// Task: read FIFO, enqueue samples
+// ------------------------- MPU Task -------------------------
 static void mpu_task(void *arg)
 {
     uint8_t buf[FIFO_FRAME_SIZE];
@@ -162,14 +167,37 @@ static void mpu_task(void *arg)
                     xSemaphoreGive(data_mutex);
                 }
 
-                if (xQueueSend(data_queue, &pkt, 0) != pdPASS)
-                    ESP_LOGW(TAG, "Queue full, dropping sample");
+                // Push to real-time queue
+                if (++downsample_counter >= 200)
+                { // 1000/100 = 10 Hz
+                    downsample_counter = 0;
+
+                    if (xQueueSend(stream_queue, &pkt, 0) != pdPASS)
+                    {
+                        ESP_LOGW(TAG, "Stream queue full, replaceing with oldest");
+                        // Queue full → drop oldest
+                        synchronized_sample_t dummy;
+                        xQueueReceive(stream_queue, &dummy, 0); // remove one
+                        xQueueSend(stream_queue, &pkt, 0);      // now push latest
+                    }
+                }
+
+                // // Fill batch
+                // batch_buf[batch_index++] = pkt;
+                // if (batch_index == BATCH_SIZE)
+                // {
+                //     if (xQueueSend(batch_queue, batch_buf, 0) != pdPASS)
+                //     {
+                //         ESP_LOGW(TAG, "Batch queue full, dropping batch");
+                //     }
+                //     batch_index = 0;
+                // }
             }
         }
     }
 }
 
-// ------------------------- INA226 Task -------------------------
+// ------------------------- INA226 -------------------------
 static esp_err_t read_ina226(ina226_data_t *out)
 {
     uint8_t buf[2], reg = INA226_REG_CURRENT;
@@ -196,7 +224,7 @@ static void ina_task(void *arg)
     }
 }
 
-// ------------------------- SHTC3 Task -------------------------
+// ------------------------- SHTC3 -------------------------
 static uint8_t crc8(const uint8_t *data, int len)
 {
     uint8_t crc = CRC8_INIT;
@@ -208,6 +236,7 @@ static uint8_t crc8(const uint8_t *data, int len)
     }
     return crc;
 }
+
 static esp_err_t shtc3_send_cmd(uint16_t cmd)
 {
     uint8_t buf[2] = {(cmd >> 8) & 0xFF, cmd & 0xFF};
@@ -223,14 +252,10 @@ static esp_err_t shtc3_send_cmd(uint16_t cmd)
 static esp_err_t read_shtc3(shtc3_data_t *out)
 {
     uint8_t buf[6];
-
-    // Send measure command
     if (shtc3_send_cmd(SHTC3_CMD_MEASURE_TF) != ESP_OK)
         return ESP_FAIL;
 
-    vTaskDelay(pdMS_TO_TICKS(25)); // wait for conversion
-
-    // Now read 6 bytes directly, no register
+    vTaskDelay(pdMS_TO_TICKS(25));
     esp_err_t ret = ESP_FAIL;
     if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(20)))
     {
@@ -240,7 +265,6 @@ static esp_err_t read_shtc3(shtc3_data_t *out)
     if (ret != ESP_OK)
         return ret;
 
-    // CRC check
     if (crc8(buf, 2) != buf[2] || crc8(buf + 3, 2) != buf[5])
         return ESP_ERR_INVALID_CRC;
 
@@ -269,30 +293,33 @@ static void shtc_task(void *arg)
     }
 }
 
-// ------------------------- Processing Task -------------------------
-static void processing_task(void *arg)
+// ------------------------- Public API -------------------------
+bool sensor_manager_get_next_sample(synchronized_sample_t *out, TickType_t timeout)
 {
-    int count = 0;
-    for (;;)
-    {
-        synchronized_sample_t pkt;
-        if (xQueueReceive(data_queue, &pkt, portMAX_DELAY))
-        {
-            batch_buf[count++] = pkt;
-            if (count == BATCH_SIZE)
-            {
-                ESP_LOGI(TAG, "Batch full: %d samples. Last ax=%.2f ay=%.2f az=%.2f I=%.3fA T=%.2fC",
-                         count, pkt.accel_x_g, pkt.accel_y_g, pkt.accel_z_g,
-                         pkt.latest_current_a, pkt.latest_temperature_c);
-                // TODO: run_ai_inference(batch_buf);
-                // TODO: publish_mqtt(batch_buf);
-                count = 0;
-            }
-        }
-    }
+    return (xQueueReceive(stream_queue, out, timeout) == pdTRUE);
 }
 
-// ------------------------- Init -------------------------
+bool sensor_manager_get_batch(synchronized_sample_t *out_batch, int *out_count, TickType_t timeout)
+{
+    if (xQueueReceive(batch_queue, out_batch, timeout) == pdTRUE)
+    {
+        *out_count = BATCH_SIZE;
+        return true;
+    }
+    return false;
+}
+
+bool sensor_manager_get_latest_environment(shtc3_data_t *out)
+{
+    if (xSemaphoreTake(data_mutex, pdMS_TO_TICKS(10)))
+    {
+        *out = latest_shtc;
+        xSemaphoreGive(data_mutex);
+        return true;
+    }
+    return false;
+}
+
 esp_err_t sensor_manager_init(void)
 {
     // I2C bus
@@ -302,19 +329,27 @@ esp_err_t sensor_manager_init(void)
         .scl_io_num = 16,
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = false // external 4.7k pull-ups used
-    };
+        .flags.enable_internal_pullup = false};
     ESP_ERROR_CHECK(i2c_new_master_bus(&cfg, &bus_handle));
 
     i2c_device_config_t dev_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .scl_speed_hz = 400000};
 
-    // Create OS objects BEFORE init
+    // OS objects
     i2c_mutex = xSemaphoreCreateMutex();
     data_mutex = xSemaphoreCreateMutex();
     mpu_sem = xSemaphoreCreateBinary();
-    data_queue = xQueueCreate(QUEUE_LEN, sizeof(synchronized_sample_t));
+
+    stream_queue = xQueueCreate(STREAM_QUEUE_LEN, sizeof(synchronized_sample_t));
+    // batch_queue = xQueueCreate(BATCH_QUEUE_LEN, sizeof(synchronized_sample_t) * BATCH_SIZE);
+    batch_queue = xQueueCreate(BATCH_QUEUE_LEN, sizeof(synchronized_sample_t *));
+
+    if (!i2c_mutex || !data_mutex || !mpu_sem || !stream_queue || !batch_queue)
+    {
+        ESP_LOGE(TAG, "Failed to allocate RTOS objects (queue/semaphore creation failed)");
+        return ESP_ERR_NO_MEM;
+    }
 
     // MPU
     dev_cfg.device_address = MPU_ADDR;
@@ -340,7 +375,6 @@ esp_err_t sensor_manager_init(void)
     // SHTC3
     dev_cfg.device_address = SHTC3_ADDR;
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &shtc_dev));
-    // one-time wakeup
     uint8_t wake_cmd[2] = {(SHTC3_CMD_WAKEUP >> 8) & 0xFF, SHTC3_CMD_WAKEUP & 0xFF};
     if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(20)))
     {
@@ -351,7 +385,6 @@ esp_err_t sensor_manager_init(void)
 
     // Tasks
     xTaskCreatePinnedToCore(mpu_task, "mpu_task", 4096, NULL, 12, NULL, 1);
-    xTaskCreatePinnedToCore(processing_task, "processing", 4096, NULL, 8, NULL, 1);
     xTaskCreatePinnedToCore(ina_task, "ina_task", 2048, NULL, 6, NULL, 1);
     xTaskCreatePinnedToCore(shtc_task, "shtc_task", 4096, NULL, 5, NULL, 1);
 

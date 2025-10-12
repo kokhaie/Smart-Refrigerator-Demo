@@ -1,24 +1,37 @@
 #ifndef SENSOR_MANAGER_H
 #define SENSOR_MANAGER_H
+#pragma once
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
+#include "freertos/queue.h"
 #include "esp_err.h"
+#include <stdbool.h>
+#include <stdint.h>
 
-// --- Data Structures for Sensor Readings ---
+// ------------------------- Config -------------------------
+#define BATCH_SIZE 1000
 
-// Holds data from the INA226 Power Monitor
-typedef struct {
+// ------------------------- Data Structures -------------------------
+
+// INA226 (Power)
+typedef struct
+{
     float bus_voltage_v;
     float current_a;
 } ina226_data_t;
 
-// Holds data from the SHTC3 Temp/Humidity Sensor
-typedef struct {
+// SHTC3 (Temp/Humidity)
+typedef struct
+{
     float temperature_c;
     float humidity_rh;
 } shtc3_data_t;
 
-// Holds data from the MPU6050 IMU
-typedef struct {
+// MPU6050 (Motion)
+typedef struct
+{
     float accel_x_g, accel_y_g, accel_z_g;
     float gyro_x_dps, gyro_y_dps, gyro_z_dps;
     float pitch, roll;
@@ -34,32 +47,48 @@ typedef struct
     int32_t gyro_z;
 } mpu6050_offsets_t;
 
+// Unified synchronized sample
+typedef struct
+{
+    uint64_t timestamp_us;
+    float accel_x_g;
+    float accel_y_g;
+    float accel_z_g;
+    float latest_current_a;
+    float latest_temperature_c;
+    float magnitude;
+} synchronized_sample_t;
+
+// ------------------------- API -------------------------
+
 /**
- * @brief Initializes the I2C bus and all sensors, and starts the background reading tasks.
- * * @return esp_err_t ESP_OK on success, otherwise an error code.
+ * @brief Initialize the sensor manager.
+ * Creates I2C bus, initializes sensors, and starts tasks.
  */
 esp_err_t sensor_manager_init(void);
 
 /**
- * @brief Thread-safely gets the latest data from the MPU6050 sensor.
- * * @param data Pointer to a struct where the data will be copied.
- * @return esp_err_t ESP_OK on success, ESP_FAIL if the data could not be retrieved.
+ * @brief Get the next decimated sample (for real-time stream/MQTT/graphs).
+ * @param out Pointer to store the sample
+ * @param timeout Timeout ticks to wait
+ * @return true if a sample was retrieved, false otherwise
  */
-esp_err_t sensor_manager_get_latest_mpu6050_data(mpu6050_data_t *data);
+bool sensor_manager_get_next_sample(synchronized_sample_t *out, TickType_t timeout);
 
 /**
- * @brief Thread-safely gets the latest data from the INA226 sensor.
- * * @param data Pointer to a struct where the data will be copied.
- * @return esp_err_t ESP_OK on success, ESP_FAIL if the data could not be retrieved.
+ * @brief Get the latest full batch of samples (for AI training).
+ * @param out_batch Pointer to buffer to hold the batch (must be size BATCH_SIZE)
+ * @param out_count Returns the number of samples (should always be BATCH_SIZE)
+ * @param timeout Timeout ticks to wait
+ * @return true if a batch was retrieved, false otherwise
  */
-esp_err_t sensor_manager_get_latest_ina226_data(ina226_data_t *data);
+bool sensor_manager_get_batch(synchronized_sample_t *out_batch, int *out_count, TickType_t timeout);
 
 /**
- * @brief Thread-safely gets the latest data from the SHTC3 sensor.
- * * @param data Pointer to a struct where the data will be copied.
- * @return esp_err_t ESP_OK on success, ESP_FAIL if the data could not be retrieved.
+ * @brief Get the latest environment data (temperature/humidity).
+ * @param out Pointer to shtc3_data_t struct
+ * @return true if valid data was retrieved, false otherwise
  */
-esp_err_t sensor_manager_get_latest_shtc3_data(shtc3_data_t *data);
-
+bool sensor_manager_get_latest_environment(shtc3_data_t *out);
 
 #endif // SENSOR_MANAGER_H
