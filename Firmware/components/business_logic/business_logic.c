@@ -1,5 +1,5 @@
 #include <stdio.h>
-
+#include <math.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -11,95 +11,189 @@
 
 static const char *TAG = "BUSINESS_LOGIC";
 
-// PID Tuning Constants ---
-float Kp = 2.5f;
-float Ki = 0.5f;
-float Kd = 1.0f;
-float setpoint = 25.0f;
-QueueHandle_t g_setpoint_queue;
+// ------------------- PID Tuning Constants -------------------
+float Kp = 99.0f;
+float Ki = 0.33f;
+float Kd = 0.0f;
+float setpoint = 10.0f;
 
-void update_setpoint(float new_stepoint)
-{
-    xQueueOverwrite(g_setpoint_queue, &new_stepoint);
+// ------------------- Control Parameters -------------------
+#define TEMP_BAND        0.5f   // °C hysteresis around setpoint
+#define INTEGRAL_DECAY   0.98f  // bleed integrator when below SP
+#define DUTY_CUTOFF_OFF  5      // below this, compressor OFF
+#define DUTY_CUTOFF_ON   12     // above this, compressor ON again
+
+// Ramping
+#define DUTY_RAMP_UP     8.0f   // % per control cycle (fast increase)
+#define DUTY_RAMP_DOWN   3.0f   // % per control cycle (slow decrease)
+
+// ------------------- Simulation Constants -------------------
+#define USE_SENSOR_AMBIENT 0
+#define SIM_AMBIENT_C      30.0f
+#define SIM_HEAT_LEAK_RATE 0.015f
+#define SIM_MAX_COOL_RATE  0.80f
+#define SIM_THERMAL_MASS   20.0f
+#define SIM_MIN_C          0.0f
+#define SIM_MAX_C          60.0f
+
+// ------------------- Globals -------------------
+QueueHandle_t g_setpoint_queue;
+static float sim_temp_c = SIM_AMBIENT_C;
+static bool sim_seeded = false;
+
+// Hysteresis state
+static bool fan_on = true;
+static bool duty_on = true;
+
+// Ramped duty state
+static float current_duty = 0.0f;
+
+// ------------------- Simulation Helpers -------------------
+static void sim_seed_from_sensor(float sensor_temp_c, bool sensor_ok) {
+    if (sensor_ok && sensor_temp_c > SIM_MIN_C && sensor_temp_c < SIM_MAX_C) {
+        sim_temp_c = sensor_temp_c;
+    } else {
+        sim_temp_c = SIM_AMBIENT_C;
+    }
+    sim_seeded = true;
 }
 
-// --- 3. PID Control Task ---
-void pid_fan_control_task(void *pvParameters)
-{
+static void sim_update(float fan_percent, float dt_sec, float ambient_c) {
+    float cooling_power = (fan_percent / 100.0f) * SIM_MAX_COOL_RATE;
+    float heat_leak = (ambient_c - sim_temp_c) * SIM_HEAT_LEAK_RATE;
+    float dT = (heat_leak - cooling_power) / SIM_THERMAL_MASS;
+    sim_temp_c += dT * dt_sec;
 
-    float setpoint = 25.0f;
-    float received_setpoint;
+    if (sim_temp_c < SIM_MIN_C) sim_temp_c = SIM_MIN_C;
+    if (sim_temp_c > SIM_MAX_C) sim_temp_c = SIM_MAX_C;
+}
 
+void update_setpoint(float new_setpoint) {
+    xQueueOverwrite(g_setpoint_queue, &new_setpoint);
+}
+
+// ------------------- PID Task -------------------
+void pid_fan_control_task(void *pvParameters) {
     shtc3_data_t shtc3_data;
 
-    // PID state variables
-    float integral_term = 0.0f; // This will hold the complete integral term
-    float previous_process_variable = 0.0f;
-    bool is_first_run = true; // Flag to handle the first loop iteration correctly
+    float integral_term = 0.0f;
+    float previous_process_variable = SIM_AMBIENT_C;
 
-    // Timekeeping variables
     int64_t last_time = esp_timer_get_time();
+    float last_fan_percent = 0.0f;
 
-    // --- Main Control Loop ---
-    for (;;)
-    {
-        if (xQueueReceive(g_setpoint_queue, &received_setpoint, 0) == pdTRUE)
+    for (;;) {
+        // --- Handle setpoint updates ---
+        float received_setpoint;
+        if (xQueueReceive(g_setpoint_queue, &received_setpoint, 0) == pdTRUE) {
             setpoint = received_setpoint;
+            integral_term = 0.0f; // reset integrator on setpoint change
+        }
 
-        if (sensor_manager_read_shtc3(&shtc3_data) == ESP_OK)
-        {
-            // --- Time Calculation ---
-            int64_t now = esp_timer_get_time();
-            float time_delta = (float)(now - last_time) / 1000000.0f; // Time delta in seconds
-            last_time = now;
+        // --- Sensor update ---
+        bool sensor_ok = sensor_manager_get_latest_environment(&shtc3_data);
 
-            float process_variable = shtc3_data.temperature_c;
+        // --- Timing ---
+        int64_t now = esp_timer_get_time();
+        float time_delta = (float)(now - last_time) / 1000000.0f;
+        last_time = now;
+        if (time_delta <= 0.0f || time_delta > 5.0f) {
+            time_delta = 0.25f; // fallback
+        }
 
-            // FIX 1: Prevent large derivative "kick" on the first run
-            if (is_first_run)
-            {
-                previous_process_variable = process_variable;
-                is_first_run = false;
-                // Skip the rest of the loop for the first valid reading
-                vTaskDelay(pdMS_TO_TICKS(100));
-                continue;
-            }
+        // --- Simulation update ---
+        if (!sim_seeded) {
+            sim_seed_from_sensor(sensor_ok ? shtc3_data.temperature_c : SIM_AMBIENT_C,
+                                 sensor_ok);
+        }
+        float ambient_value = (USE_SENSOR_AMBIENT && sensor_ok) ?
+                              shtc3_data.temperature_c : SIM_AMBIENT_C;
+        sim_update(last_fan_percent, time_delta, ambient_value);
 
-            // --- PID Calculation ---
-            float error = process_variable - setpoint;
-            float p_term = Kp * error;
+        float process_variable = sim_temp_c;
 
-            // The derivative is calculated before the integral for use in anti-windup
-            float d_term = Kd * (process_variable - previous_process_variable) / time_delta;
-            previous_process_variable = process_variable;
+        // ------------------- PID Logic -------------------
+        float error = process_variable - setpoint;
 
-            // FIX 2: Implement robust anti-windup (Conditional Integration)
-            float potential_output = p_term + integral_term + d_term;
-            if (potential_output < 255.0f && potential_output > 0.0f)
-            {
+        // P term
+        float p_term = Kp * error;
+
+        // I term with decay
+        float u_unsat = p_term + integral_term;
+        if (error > 0.0f) {
+            if (!(u_unsat > 255.0f && error > 0.0f)) {
                 integral_term += Ki * error * time_delta;
             }
-
-            // --- Final Output Calculation and Clamping ---
-            float output = p_term + integral_term + d_term;
-            if (output > 255.0f)
-                output = 255.0f;
-            if (output < 0.0f)
-                output = 0.0f;
-
-            // FIX 3: Actually apply the output to the motor
-            set_fan_speed((uint8_t)output);
-            ESP_LOGI(TAG, "Setpoint: %.2f°C, Temp: %.2f°C, Fan PWM: %d", setpoint, process_variable, (uint8_t)output);
+        } else {
+            integral_term *= INTEGRAL_DECAY;
         }
-        else
-        {
-            // FIX 4: Handle sensor failure gracefully
-            ESP_LOGE(TAG, "Failed to read SHTC3. Turning fan off for safety.");
-            set_fan_speed(0);  // Set motor to a known, safe state
-            is_first_run = true; // Reset state for the next successful read
+        if (integral_term < 0.0f) integral_term = 0.0f;
+        if (integral_term > 255.0f) integral_term = 255.0f;
+
+        // D term
+        float derivative = (process_variable - previous_process_variable) / time_delta;
+        previous_process_variable = process_variable;
+        float d_term = Kd * derivative;
+
+        // Raw PID output
+        float output = p_term + integral_term + d_term;
+        if (output < 0.0f) output = 0.0f;
+        if (output > 255.0f) output = 255.0f;
+        float duty_pct = (output / 255.0f) * 100.0f;
+
+        // ------------------- Temperature hysteresis -------------------
+        if (fan_on) {
+            if (process_variable <= setpoint) {
+                fan_on = false;
+            }
+        } else {
+            if (process_variable >= setpoint + TEMP_BAND) {
+                fan_on = true;
+            }
         }
 
-        // FIX 5: Ensure a consistent loop delay, regardless of success or failure
-        vTaskDelay(pdMS_TO_TICKS(100));
+        // ------------------- Duty cutoff hysteresis -------------------
+        if (duty_on) {
+            if (duty_pct < DUTY_CUTOFF_OFF) {
+                duty_on = false;
+            }
+        } else {
+            if (duty_pct >= DUTY_CUTOFF_ON) {
+                duty_on = true;
+            }
+        }
+
+        float target_duty = (fan_on && duty_on) ? duty_pct : 0.0f;
+
+        // ------------------- Asymmetric Ramping -------------------
+        if (target_duty > current_duty + DUTY_RAMP_UP) {
+            current_duty += DUTY_RAMP_UP;
+        } else if (target_duty < current_duty - DUTY_RAMP_DOWN) {
+            current_duty -= DUTY_RAMP_DOWN;
+        } else {
+            current_duty = target_duty;
+        }
+
+        if (current_duty > 100.0f) current_duty = 100.0f;
+        if (current_duty < 0.0f) current_duty = 0.0f;
+
+        // Apply to hardware
+        set_fan_speed((uint8_t)current_duty);
+        last_fan_percent = current_duty;
+
+        ESP_LOGI(TAG, "SP: %.2f°C | Real: %.2f°C | Sim(PV): %.2f°C | TargetFan: %.1f%% | RampedFan: %.1f%%",
+                 setpoint,
+                 sensor_ok ? shtc3_data.temperature_c : NAN,
+                 process_variable,
+                 target_duty,
+                 current_duty);
+
+        vTaskDelay(pdMS_TO_TICKS(250)); // ~4 Hz
     }
+}
+
+void business_logic_start(void) {
+    g_setpoint_queue = xQueueCreate(1, sizeof(float));
+    xTaskCreatePinnedToCore(pid_fan_control_task, "pid_fan_control",
+                            4096, NULL, 5, NULL, 1);
 }

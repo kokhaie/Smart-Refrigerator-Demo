@@ -104,10 +104,11 @@ void app_main(void)
         return;
     }
 
-    // business_logic_start();
 
     // touch_slider_init();
     motors_init();
+    business_logic_start();
+    update_setpoint(25);
 
     //  ui manager init
 

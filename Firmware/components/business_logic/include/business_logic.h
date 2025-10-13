@@ -6,5 +6,6 @@
 extern QueueHandle_t g_setpoint_queue;
 void update_setpoint(float setpoint);
 void pid_fan_control_task(void *pvParameters);
+void business_logic_start(void);
 
 #endif // BUSINESS_LOGIC_H

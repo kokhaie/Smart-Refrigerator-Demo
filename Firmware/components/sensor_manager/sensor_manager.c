@@ -174,7 +174,7 @@ static void mpu_task(void *arg)
 
                     if (xQueueSend(stream_queue, &pkt, 0) != pdPASS)
                     {
-                        ESP_LOGW(TAG, "Stream queue full, replaceing with oldest");
+                        ESP_LOGI(TAG, "Stream queue full, replaceing with oldest");
                         // Queue full → drop oldest
                         synchronized_sample_t dummy;
                         xQueueReceive(stream_queue, &dummy, 0); // remove one
