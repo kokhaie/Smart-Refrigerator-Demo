@@ -138,6 +138,69 @@ void init_lcd_panel(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t 
 
     *panel = panel_handle;
 }
+static void lcd_color_test(lv_display_t *display)
+{
+    esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)lv_display_get_user_data(display);
+    if (!panel_handle)
+    {
+        ESP_LOGE(TAG, "Panel handle is NULL!");
+        return;
+    }
+
+    // Allocate one strip buffer (height = 40 lines here, adjust as needed)
+    int strip_lines = 40;
+    size_t strip_pixels = CONFIG_LCD_H_RES * strip_lines;
+    size_t buffer_size = strip_pixels * sizeof(uint16_t);
+
+    uint16_t *line_buf = heap_caps_malloc(buffer_size, MALLOC_CAP_DMA);
+    if (!line_buf)
+    {
+        ESP_LOGE(TAG, "Failed to allocate strip buffer!");
+        return;
+    }
+
+    // Test colors
+    uint16_t colors[] = {
+        0xF800, // Red
+        0x07E0, // Green
+        0x001F, // Blue
+        0xFFFF, // White
+        0x0000  // Black
+    };
+    while (1)
+    {
+
+        for (int c = 0; c < sizeof(colors) / sizeof(colors[0]); c++)
+        {
+            ESP_LOGI(TAG, "LCD test color: 0x%04X", colors[c]);
+
+            // Fill once (all pixels same color)
+            for (size_t i = 0; i < strip_pixels; i++)
+            {
+                line_buf[i] = colors[c];
+            }
+
+            // Push in strips
+            for (int y = 0; y < CONFIG_LCD_V_RES; y += strip_lines)
+            {
+                int y_end = y + strip_lines;
+                if (y_end > CONFIG_LCD_V_RES)
+                {
+                    y_end = CONFIG_LCD_V_RES;
+                }
+                ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle,
+                                                          0, y,
+                                                          CONFIG_LCD_H_RES, y_end,
+                                                          line_buf));
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(2000));
+        }
+    }
+    free(line_buf);
+    ESP_LOGI(TAG, "LCD color test finished");
+}
+
 void ui_manager_start(void)
 {
     esp_lcd_panel_io_handle_t io_handle = NULL;
@@ -160,9 +223,9 @@ void ui_manager_start(void)
     size_t draw_buffer_sz = CONFIG_LCD_H_RES * LVGL_DRAW_BUF_LINES * sizeof(lv_color16_t);
     // alloc draw buffers used by LVGL
     uint32_t draw_buf_alloc_caps = 0;
-// #if CONFIG_EXAMPLE_LCD_I80_COLOR_IN_PSRAM
+    // #if CONFIG_EXAMPLE_LCD_I80_COLOR_IN_PSRAM
     draw_buf_alloc_caps |= MALLOC_CAP_SPIRAM;
-// #endif
+    // #endif
     void *buf1 = esp_lcd_i80_alloc_draw_buffer(io_handle, draw_buffer_sz, draw_buf_alloc_caps);
     void *buf2 = esp_lcd_i80_alloc_draw_buffer(io_handle, draw_buffer_sz, draw_buf_alloc_caps);
     assert(buf1);
@@ -200,6 +263,7 @@ void ui_manager_start(void)
     ESP_LOGI(TAG, "Display LVGL animation");
     // Lock the mutex due to the LVGL APIs are not thread-safe
     _lock_acquire(&lvgl_api_lock);
-    ui_init(display);
+    // ui_init(display);
+    lcd_color_test(display);
     _lock_release(&lvgl_api_lock);
 }

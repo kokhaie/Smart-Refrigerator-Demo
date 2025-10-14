@@ -9,6 +9,7 @@
 #include "touch_slider.h"
 #include "motors.h"
 #include "data_publisher.h"
+#include "ui_manager.h"
 
 static const char *TAG = "MAIN_APP";
 
@@ -127,7 +128,6 @@ void start_tasks(void)
      * =================================================================
      */
 
-     
     // xTaskCreatePinnedToCore(touch_slider_task, "touch_slider_task", 4096, NULL, 12, NULL, 0);
     // xTaskCreatePinnedToCore(network_manager_task, "network_manager_task", 4096, NULL, 10, NULL, 0);
     // xTaskCreatePinnedToCore(ui_manager_task, "ui_manager_task", 4096, NULL, 8, NULL, 0);
@@ -180,20 +180,25 @@ void app_status_update_cb(network_status_t status)
 }
 void app_main(void)
 {
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    // esp_err_t ret = nvs_flash_init();
+    // if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    // {
+    //     ESP_ERROR_CHECK(nvs_flash_erase());
+    //     ret = nvs_flash_init();
+    // }
+    // ESP_ERROR_CHECK(ret);
+
+    // // touch_slider_init();
+    // // motors_init();
+
+    // //  ui manager init
+
+    // if (sensor_manager_init() != ESP_OK)
+    //     ESP_LOGE("MAIN", "Sensor initialization failed. Halting application.");
+    // network_manager_start(app_status_update_cb);
+    ui_manager_start();
+    while (1)
     {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
-    ESP_ERROR_CHECK(ret);
-
-    // touch_slider_init();
-    // motors_init();
-
-    //  ui manager init
-
-    if (sensor_manager_init() != ESP_OK)
-        ESP_LOGE("MAIN", "Sensor initialization failed. Halting application.");
-    network_manager_start(app_status_update_cb);
 }
