@@ -22,9 +22,4 @@ void set_fan_speed(uint8_t percentage);
  */
 void set_vibration_speed(uint8_t percentage);
 
-/**
- * @brief Sets the fan speed with a kick-start for low speeds.
- *
- * @param percentage The desired speed from 0 to 100.
- */
 #endif // MOTORS_H

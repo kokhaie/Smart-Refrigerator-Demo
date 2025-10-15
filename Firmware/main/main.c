@@ -9,39 +9,10 @@
 #include "touch_slider.h"
 #include "motors.h"
 #include "data_publisher.h"
+#include "led_manager.h"
+#include "ui_controller.h"
 
 static const char *TAG = "MAIN_APP";
-
-void touch_slider_task(void *pvParameters)
-{
-    uint8_t last_position = 25;
-
-    for (;;)
-    {
-        // --- Handle Events ---
-        // First, check if the specific double-touch event occurred.
-        if (touch_slider_was_double_touched())
-        {
-            ESP_LOGW(TAG, "ACTION: Double Touch Event Triggered!");
-            // Add your double-touch action here (e.g., toggle a light)
-        }
-
-        // --- Handle State ---
-        // Separately, get the current slider position for continuous control.
-        uint8_t current_position = (uint8_t)touch_slider_get_position();
-
-        // Only log if the position has changed to prevent flooding the console
-        if (current_position != last_position)
-        {
-            ESP_LOGI(TAG, "Slider Position: %" PRIu32, current_position);
-            last_position = current_position;
-            publish_slider_setpoint(last_position);
-            // Add your slider action here (e.g., set brightness)
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(20)); // Poll for events and state at 50Hz
-    }
-}
 
 void app_status_update_cb(network_status_t status)
 {
@@ -88,32 +59,35 @@ void app_status_update_cb(network_status_t status)
 }
 void app_main(void)
 {
-    // Init NVS for WiFi / MQTT credentials
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
+    // // Init NVS for WiFi / MQTT credentials
+    // esp_err_t ret = nvs_flash_init();
+    // if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    // {
+    //     ESP_ERROR_CHECK(nvs_flash_erase());
+    //     ret = nvs_flash_init();
+    // }
+    // ESP_ERROR_CHECK(ret);
 
-    // Init sensor manager
-    if (sensor_manager_init() != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Sensor initialization failed. Halting.");
-        return;
-    }
+    // // Init sensor manager
+    // if (sensor_manager_init() != ESP_OK)
+    // {
+    //     ESP_LOGE(TAG, "Sensor initialization failed. Halting.");
+    //     return;
+    // }
 
 
-    // touch_slider_init();
     motors_init();
-    business_logic_start();
-    update_setpoint(25);
+    // business_logic_start();
+    touch_slider_init();
+    // update_setpoint(25);
 
-    //  ui manager init
+    // //  ui manager init
 
-    // Start network manager (Wi-Fi + MQTT)
-    network_manager_start(app_status_update_cb);
+    // // Start network manager (Wi-Fi + MQTT)
+    // network_manager_start(app_status_update_cb);
+    led_manager_init();
+    ESP_ERROR_CHECK(ui_controller_init());
+    // led_manager_show_normal(50, 50, 50);
 
     // Logger is independent of network → always available
     // data_logger_start();
