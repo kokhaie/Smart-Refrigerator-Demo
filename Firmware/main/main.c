@@ -7,13 +7,12 @@
 #include "sensor_manager.h"
 #include "business_logic.h"
 #include "touch_slider.h"
-#include "motors.h"
+#include "motor_manager.h"
 #include "data_publisher.h"
 #include "led_manager.h"
 #include "ui_controller.h"
+#include "lcd_manager.h"
 
-// Define the sleep time in microseconds for 9 hours
-#define NINE_HOURS_IN_US (9ULL * 60 * 60 * 1000 * 1000)
 
 static const char *TAG = "MAIN_APP";
 
@@ -77,11 +76,10 @@ void app_main(void)
         return;
     }
 
-    motors_init();
+    motor_manager_init();
     business_logic_start();
     touch_slider_init();
-
-    // //  ui manager init
+    lcd_manager_start();
 
     // // Start network manager (Wi-Fi + MQTT)
     network_manager_start(app_status_update_cb);

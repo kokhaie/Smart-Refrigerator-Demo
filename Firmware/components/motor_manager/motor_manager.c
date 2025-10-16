@@ -1,4 +1,4 @@
-#include "motors.h"
+#include "motor_manager.h"
 #include "driver/ledc.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
@@ -16,9 +16,9 @@
 
 #define LEDC_MAX_DUTY ((1 << 8) - 1)
 
-static const char *TAG = "MOTORS";
+static const char *TAG = "MOTOR_MANAGER";
 
-void motors_init()
+void motor_manager_init(void)
 {
     ledc_timer_config_t ledc_timer_fan = {
         .speed_mode = LEDC_MODE,
@@ -56,7 +56,7 @@ void motors_init()
         .hpoint = 0};
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel_vibration));
 
-    ESP_LOGI(TAG, "Motor component initialized");
+    ESP_LOGI(TAG, "Motor manager initialized");
     ESP_LOGI(TAG, "Fan pin: %d, Freq: %d Hz", CONFIG_FAN_PIN, CONFIG_FAN_LEDC_FREQUENCY);
     ESP_LOGI(TAG, "Vibration pin: %d, Freq: %d Hz", CONFIG_VIBRATION_PIN, CONFIG_VIBRATION_LEDC_FREQUENCY);
 }

@@ -1,6 +1,6 @@
 idf_component_register(SRCS
                     # --- Driver and Porting Layer ---
-                    "ui_manager.c"
+                    "lcd_manager.c"
                     # --- SquareLine Studio Generated UI ---
                     "ui.c"
                     "ui_helpers.c"
@@ -17,7 +17,7 @@ idf_component_register(SRCS
                     "fonts/ui_font_yekanreg22.c"
                     # --- Public and Private Include Directories ---
                     INCLUDE_DIRS
-                    "include"  # For public headers like ui_manager.h
+                    "include"  # For public headers like lcd_manager.h
                     "."        # For top-level headers like ui.h
                     "screens"
                     "components"

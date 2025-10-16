@@ -1,4 +1,4 @@
-#include "ui_manager.h"
+#include "lcd_manager.h"
 #include <stdio.h>
 #include <sys/lock.h>
 #include <sys/param.h>
@@ -16,7 +16,7 @@
 #include "lvgl.h"
 #include "ui.h"
 
-static const char *TAG = "UI_Manager";
+static const char *TAG = "LCD_MANAGER";
 
 // --- LVGL Porting ---
 static _lock_t lvgl_api_lock;
@@ -201,7 +201,7 @@ static void lcd_color_test(lv_display_t *display)
     ESP_LOGI(TAG, "LCD color test finished");
 }
 
-void ui_manager_start(void)
+void lcd_manager_start(void)
 {
     esp_lcd_panel_io_handle_t io_handle = NULL;
     init_i80_bus(&io_handle);

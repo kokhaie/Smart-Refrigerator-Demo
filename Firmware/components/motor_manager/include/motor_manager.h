@@ -1,12 +1,12 @@
-#ifndef MOTORS_H
-#define MOTORS_H
+#ifndef MOTOR_MANAGER_H
+#define MOTOR_MANAGER_H
 
 #include <stdint.h>
 
 /**
  * @brief Initializes the LEDC peripheral for motor control.
  */
-void motors_init(void);
+void motor_manager_init(void);
 
 /**
  * @brief Sets the fan speed.
@@ -22,4 +22,4 @@ void set_fan_speed(uint8_t percentage);
  */
 void set_vibration_speed(uint8_t percentage);
 
-#endif // MOTORS_H
+#endif // MOTOR_MANAGER_H
