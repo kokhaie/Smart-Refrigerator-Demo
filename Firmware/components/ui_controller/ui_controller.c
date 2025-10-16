@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "led_manager.h"
+#include "business_logic.h"
 #include "touch_slider.h"
 
 #include <math.h>
@@ -454,6 +455,8 @@ static void ui_controller_handle_touch_release(uint32_t position)
         s_target_temperature = new_target;
         s_ui_state = UI_STATE_TOUCHED;
         unlock_state();
+
+        update_setpoint(new_target);
 
         s_last_slider_temp_c = new_target;
         s_last_slider_position = position;

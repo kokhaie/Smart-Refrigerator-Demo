@@ -29,7 +29,8 @@
     "task.h": "c",
     "sdkconfig.h": "c",
     "gpio.h": "c",
-    "cstdint": "c"
+    "cstdint": "c",
+    "data_publisher.h": "c"
   },
   "idf.monitorPort": "/dev/ttyUSB0",
   "idf.port": "/dev/ttyUSB0"

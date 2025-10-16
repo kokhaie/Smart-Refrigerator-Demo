@@ -12,6 +12,9 @@
 #include "led_manager.h"
 #include "ui_controller.h"
 
+// Define the sleep time in microseconds for 9 hours
+#define NINE_HOURS_IN_US (9ULL * 60 * 60 * 1000 * 1000)
+
 static const char *TAG = "MAIN_APP";
 
 void app_status_update_cb(network_status_t status)
@@ -59,35 +62,32 @@ void app_status_update_cb(network_status_t status)
 }
 void app_main(void)
 {
-    // // Init NVS for WiFi / MQTT credentials
-    // esp_err_t ret = nvs_flash_init();
-    // if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    // {
-    //     ESP_ERROR_CHECK(nvs_flash_erase());
-    //     ret = nvs_flash_init();
-    // }
-    // ESP_ERROR_CHECK(ret);
+    // Init NVS for WiFi / MQTT credentials
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
 
-    // // Init sensor manager
-    // if (sensor_manager_init() != ESP_OK)
-    // {
-    //     ESP_LOGE(TAG, "Sensor initialization failed. Halting.");
-    //     return;
-    // }
-
+    // Init sensor manager
+    if (sensor_manager_init() != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Sensor initialization failed. Halting.");
+        return;
+    }
 
     motors_init();
-    // business_logic_start();
+    business_logic_start();
     touch_slider_init();
-    // update_setpoint(25);
 
     // //  ui manager init
 
     // // Start network manager (Wi-Fi + MQTT)
-    // network_manager_start(app_status_update_cb);
+    network_manager_start(app_status_update_cb);
     led_manager_init();
     ESP_ERROR_CHECK(ui_controller_init());
-    // led_manager_show_normal(50, 50, 50);
 
     // Logger is independent of network → always available
     // data_logger_start();
