@@ -16,3 +16,4 @@ dependencies:
   #   public: true
   lvgl/lvgl: ^9.3.0
   espressif/mosquitto: ^2.0.20~4
+  espressif/led_strip: ^3.0.1~1
