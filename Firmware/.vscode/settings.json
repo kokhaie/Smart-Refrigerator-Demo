@@ -29,6 +29,12 @@
     "lvgl.h": "c",
     "lv_lottie.h": "c",
     "ui_screen1.h": "c"
+    "math.h": "c",
+    "task.h": "c",
+    "sdkconfig.h": "c",
+    "gpio.h": "c",
+    "cstdint": "c",
+    "data_publisher.h": "c"
   },
   "idf.monitorPort": "/dev/ttyUSB0",
   "idf.port": "/dev/ttyUSB0"
