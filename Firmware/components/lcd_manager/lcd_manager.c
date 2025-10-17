@@ -22,10 +22,13 @@ static const char *TAG = "LCD_MANAGER";
 #define LCD_CMD_BITS 8
 #define LCD_PARAM_BITS 8
 
+// --- Rotation define (0, 90, 180, 270) ---
+#define LCD_ROTATION 270
+
 static esp_lcd_panel_handle_t panel_handle = NULL;
 static lv_display_t *lvgl_disp = NULL;
 
-// Allocate framebuffers in PSRAM (no DRAM usage!)
+// Allocate framebuffers in PSRAM
 static lv_color_t *lvgl_buf1 = NULL;
 static lv_color_t *lvgl_buf2 = NULL;
 
@@ -85,6 +88,36 @@ static void init_i80_bus(esp_lcd_panel_io_handle_t *io_handle)
 }
 
 //------------------------------------------------------------------
+// ST7789 rotation helper (MADCTL register 0x36)
+//------------------------------------------------------------------
+static void st7789_set_rotation(esp_lcd_panel_io_handle_t io, uint16_t rotation)
+{
+    uint8_t madctl = 0x00;
+
+    switch (rotation)
+    {
+    case 0:
+        madctl = 0x00; // Normal
+        break;
+    case 90:
+        madctl = 0x60; // MV + MX
+        break;
+    case 180:
+        madctl = 0xC0; // MX + MY
+        break;
+    case 270:
+        madctl = 0xA0; // MV + MY
+        break;
+    default:
+        madctl = 0x00;
+        break;
+    }
+
+    ESP_LOGI(TAG, "Apply MADCTL rotation = %d deg (0x%02X)", rotation, madctl);
+    ESP_ERROR_CHECK(esp_lcd_panel_io_tx_param(io, 0x36, &madctl, 1));
+}
+
+//------------------------------------------------------------------
 // LCD panel init (ST7789 240x280 with gap_y=20)
 //------------------------------------------------------------------
 static void init_lcd_panel(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t *panel)
@@ -92,7 +125,7 @@ static void init_lcd_panel(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_ha
     ESP_LOGI(TAG, "Install LCD driver of st7789");
     esp_lcd_panel_dev_config_t panel_config = {
         .reset_gpio_num = CONFIG_LCD_PIN_RST,
-        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB, // use BGR if colors wrong
+        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB, // Use BGR if colors wrong
         .bits_per_pixel = 16,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, panel));
@@ -100,12 +133,10 @@ static void init_lcd_panel(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_ha
     esp_lcd_panel_reset(*panel);
     esp_lcd_panel_init(*panel);
 
-    // Rotate to match orientation
-    esp_lcd_panel_swap_xy(*panel, false);
-    esp_lcd_panel_mirror(*panel, false, false);
+    // --- Hardware rotation ---
+    st7789_set_rotation(io_handle, LCD_ROTATION);
 
-    // Shift to align image
-    esp_lcd_panel_set_gap(*panel, 0, 20);
+    esp_lcd_panel_set_gap(*panel, 20, 0);
 
     esp_lcd_panel_invert_color(*panel, true);
     esp_lcd_panel_disp_on_off(*panel, true);
@@ -124,7 +155,7 @@ void lcd_manager_start(void)
     const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     ESP_ERROR_CHECK(lvgl_port_init(&lvgl_cfg));
 
-    // --- Allocate LVGL framebuffers in PSRAM (aligned) ---
+    // --- Allocate LVGL framebuffers in PSRAM ---
     size_t fb_size = LCD_H_RES * LCD_V_RES * sizeof(lv_color_t);
 
     lvgl_buf1 = (lv_color_t *)heap_caps_aligned_alloc(
@@ -137,7 +168,12 @@ void lcd_manager_start(void)
     assert(lvgl_buf1 && lvgl_buf2);
 
     // --- Register LVGL display ---
+#if (LCD_ROTATION == 90) || (LCD_ROTATION == 270)
+    lvgl_disp = lv_display_create(LCD_V_RES, LCD_H_RES); // swap res
+#else
     lvgl_disp = lv_display_create(LCD_H_RES, LCD_V_RES);
+#endif
+
     lv_display_set_flush_cb(lvgl_disp, psram_flush_cb);
     lv_display_set_buffers(
         lvgl_disp,
