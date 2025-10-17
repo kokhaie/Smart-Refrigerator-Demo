@@ -1,4 +1,8 @@
 #include "../ui.h"
+#include "freertos/FreeRTOS.h"
+#include "esp_log.h"
+static const char *TAG = "SPLASH";
+
 // #include "lv_lottie.h"
 
 // event funtions
@@ -15,40 +19,236 @@ const uint8_t lv_example_lottie_approve[] = {
     0x6c, 0x6c, 0x69, 0x70, 0x73, 0x65, 0x20, 0x31, 0x22, 0x2c, 0x22, 0x6e, 0x70, 0x22, 0x3a, 0x33, 0x2c, 0x22, 0x63, 0x69, 0x78, 0x22, 0x3a, 0x32, 0x2c, 0x22, 0x62, 0x6d, 0x22, 0x3a, 0x30, 0x2c, 0x22, 0x69, 0x78, 0x22, 0x3a, 0x31, 0x2c, 0x22, 0x6d, 0x6e, 0x22, 0x3a, 0x22, 0x41, 0x44, 0x42, 0x45, 0x20, 0x56, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x20, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x22, 0x2c, 0x22, 0x68, 0x64, 0x22, 0x3a, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x7d, 0x2c, 0x7b, 0x22, 0x74, 0x79, 0x22, 0x3a, 0x22, 0x74, 0x6d, 0x22, 0x2c, 0x22, 0x73, 0x22, 0x3a, 0x7b, 0x22, 0x61, 0x22, 0x3a, 0x30, 0x2c, 0x22, 0x6b, 0x22, 0x3a, 0x30, 0x2c, 0x22, 0x69, 0x78, 0x22, 0x3a, 0x31, 0x7d, 0x2c, 0x22, 0x65, 0x22, 0x3a, 0x7b, 0x22, 0x61, 0x22, 0x3a, 0x31, 0x2c, 0x22, 0x6b, 0x22, 0x3a, 0x5b, 0x7b, 0x22, 0x69, 0x22, 0x3a, 0x7b, 0x22, 0x78, 0x22, 0x3a, 0x5b, 0x30, 0x2e, 0x33, 0x36, 0x38, 0x5d, 0x2c, 0x22, 0x79, 0x22, 0x3a, 0x5b, 0x31, 0x5d, 0x7d, 0x2c, 0x22, 0x6f, 0x22, 0x3a, 0x7b, 0x22, 0x78, 0x22, 0x3a, 0x5b, 0x30, 0x2e, 0x32, 0x35, 0x31, 0x5d, 0x2c, 0x22, 0x79, 0x22, 0x3a, 0x5b, 0x30, 0x5d, 0x7d, 0x2c, 0x22, 0x74, 0x22, 0x3a, 0x30, 0x2c, 0x22, 0x73, 0x22, 0x3a, 0x5b, 0x30, 0x5d, 0x7d, 0x2c, 0x7b, 0x22, 0x74, 0x22, 0x3a, 0x34, 0x30, 0x2c, 0x22, 0x73, 0x22, 0x3a, 0x5b, 0x38, 0x34, 0x5d, 0x7d, 0x5d, 0x2c, 0x22, 0x69, 0x78, 0x22, 0x3a, 0x32, 0x7d, 0x2c, 0x22, 0x6f, 0x22, 0x3a, 0x7b, 0x22, 0x61, 0x22, 0x3a, 0x30, 0x2c, 0x22, 0x6b, 0x22, 0x3a, 0x30, 0x2c, 0x22, 0x69, 0x78, 0x22, 0x3a, 0x33, 0x7d, 0x2c, 0x22, 0x6d, 0x22, 0x3a, 0x31, 0x2c, 0x22, 0x69, 0x78, 0x22, 0x3a, 0x32, 0x2c, 0x22, 0x6e, 0x6d, 0x22, 0x3a, 0x22, 0x54, 0x72, 0x69, 0x6d, 0x20, 0x50, 0x61, 0x74, 0x68, 0x73, 0x20, 0x31, 0x22, 0x2c, 0x22, 0x6d, 0x6e, 0x22, 0x3a, 0x22, 0x41, 0x44, 0x42, 0x45, 0x20, 0x56, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x20, 0x46, 0x69, 0x6c, 0x74, 0x65, 0x72, 0x20, 0x2d, 0x20, 0x54, 0x72, 0x69, 0x6d, 0x22, 0x2c, 0x22, 0x68, 0x64, 0x22, 0x3a, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x7d, 0x5d, 0x2c, 0x22, 0x69, 0x70, 0x22, 0x3a, 0x30, 0x2c, 0x22, 0x6f, 0x70, 0x22, 0x3a, 0x36, 0x30, 0x2c, 0x22, 0x73, 0x74, 0x22, 0x3a, 0x30, 0x2c, 0x22, 0x62, 0x6d, 0x22, 0x3a, 0x30, 0x7d, 0x5d, 0x2c, 0x22, 0x6d, 0x61, 0x72, 0x6b, 0x65, 0x72, 0x73, 0x22, 0x3a, 0x5b, 0x5d, 0x7d,
     0x00 /*Close the string*/
 };
+
 lv_obj_t *splash_Screen = NULL;
 lv_obj_t *lottie = NULL;
-#define LOTTIE_WIDTH 128
-#define LOTTIE_HEIGHT 128
-#include "esp_heap_caps.h"
+lv_draw_buf_t *draw_buf = NULL;
+uint8_t *lottie_buf = NULL;
+static volatile bool cleanup_in_progress = false;
 
-static uint8_t *lottie_buf = NULL;
-static lv_draw_buf_t draw_buf;
+#define LOTTIE_WIDTH 64
+#define LOTTIE_HEIGHT 64
+
+// Helper function to safely allocate PSRAM
+static void *safe_psram_alloc(size_t size, size_t alignment)
+{
+    void *ptr = heap_caps_aligned_alloc(alignment, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (ptr != NULL)
+    {
+        memset(ptr, 0, size);
+    }
+    return ptr;
+}
+
+// Helper function to safely allocate DRAM
+static void *safe_dram_alloc(size_t size)
+{
+    void *ptr = heap_caps_malloc(size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (ptr != NULL)
+    {
+        memset(ptr, 0, size);
+    }
+    return ptr;
+}
 
 void splash_screen_init(void)
 {
+    ESP_LOGI(TAG, "=== Splash Screen Init ===");
+    ESP_LOGI(TAG, "Free DRAM: %lu bytes", heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    ESP_LOGI(TAG, "Free PSRAM: %lu bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+
+    cleanup_in_progress = false;
+
+    // Create splash screen
     splash_Screen = lv_obj_create(NULL);
+    if (splash_Screen == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to create splash screen!");
+        return;
+    }
 
+    lv_obj_set_style_bg_color(splash_Screen, lv_color_black(), 0);
+    lv_obj_clear_flag(splash_Screen, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Calculate buffer size for ARGB8888 (4 bytes per pixel)
+    const size_t buf_size = LOTTIE_WIDTH * LOTTIE_HEIGHT * 4;
+    ESP_LOGI(TAG, "Allocating %zu bytes for Lottie animation...", buf_size);
+
+    // Allocate draw_buf descriptor in DRAM (must be internal RAM)
+    draw_buf = (lv_draw_buf_t *)safe_dram_alloc(sizeof(lv_draw_buf_t));
+    if (draw_buf == NULL)
+    {
+        ESP_LOGE(TAG, "FAILED to allocate draw_buf descriptor!");
+        goto error_cleanup;
+    }
+    ESP_LOGI(TAG, "✓ Draw buffer descriptor allocated at %p (DRAM)", (void *)draw_buf);
+
+    // Allocate pixel buffer in PSRAM with 64-byte cache alignment
+    lottie_buf = (uint8_t *)safe_psram_alloc(buf_size, 64);
+    if (lottie_buf == NULL)
+    {
+        ESP_LOGE(TAG, "FAILED to allocate pixel buffer!");
+        ESP_LOGE(TAG, "Available PSRAM: %lu bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+        goto error_cleanup;
+    }
+    ESP_LOGI(TAG, "✓ Pixel buffer allocated at %p (PSRAM)", (void *)lottie_buf);
+
+    // Verify alignment
+    if (((uintptr_t)lottie_buf & 0x3F) != 0)
+    {
+        ESP_LOGW(TAG, "WARNING: Buffer not 64-byte aligned!");
+    }
+
+    // Initialize draw buffer with explicit stride calculation
+    uint32_t stride = LOTTIE_WIDTH * 4; // ARGB8888 = 4 bytes per pixel
+    lv_draw_buf_init(
+        draw_buf,
+        LOTTIE_WIDTH,
+        LOTTIE_HEIGHT,
+        LV_COLOR_FORMAT_ARGB8888,
+        stride, // Explicit stride instead of 0
+        lottie_buf,
+        buf_size);
+    ESP_LOGI(TAG, "✓ Draw buffer initialized (stride=%lu)", stride);
+
+    // Create lottie widget
     lottie = lv_lottie_create(splash_Screen);
-    lv_lottie_set_src_data(lottie,
-                           lv_example_lottie_approve,
-                           sizeof(lv_example_lottie_approve));
+    if (lottie == NULL)
+    {
+        ESP_LOGE(TAG, "FAILED to create lottie widget!");
+        goto error_cleanup;
+    }
+    ESP_LOGI(TAG, "✓ Lottie widget created at %p", (void *)lottie);
 
-    // Allocate raw pixel buffer in PSRAM
-    size_t buf_size = LOTTIE_WIDTH * LOTTIE_HEIGHT * 4; // ARGB8888
-    lottie_buf = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    assert(lottie_buf);
-    assert(lottie_buf);
+    // CRITICAL: Set buffer BEFORE loading animation data
+    lv_lottie_set_draw_buf(lottie, draw_buf);
+    ESP_LOGI(TAG, "✓ Draw buffer assigned to lottie");
 
-    // Wrap with LVGL draw buffer
-    lv_draw_buf_init(&draw_buf,
-                     LOTTIE_WIDTH, LOTTIE_HEIGHT,
-                     LV_COLOR_FORMAT_ARGB8888_PREMULTIPLIED,
-                     0,          // stride auto
-                     lottie_buf, // external buffer
-                     buf_size);  // size in bytes
+    // Small delay to ensure widget is fully initialized
+    vTaskDelay(pdMS_TO_TICKS(10));
 
-    lv_lottie_set_draw_buf(lottie, &draw_buf);
+    // Load animation data
+    ESP_LOGI(TAG, "Loading animation data (%d bytes)...", sizeof(lv_example_lottie_approve));
+    lv_lottie_set_src_data(lottie, lv_example_lottie_approve, sizeof(lv_example_lottie_approve));
+    ESP_LOGI(TAG, "✓ Animation data loaded");
 
+    // Configure widget appearance
     lv_obj_set_size(lottie, LOTTIE_WIDTH, LOTTIE_HEIGHT);
     lv_obj_center(lottie);
+
+    // Prevent auto-start if needed (uncomment if animation shouldn't auto-play)
+    // lv_lottie_set_current_frame(lottie, 0);
+
+    ESP_LOGI(TAG, "=== Splash Screen Ready ===");
+    ESP_LOGI(TAG, "Free DRAM: %lu bytes", heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    ESP_LOGI(TAG, "Free PSRAM: %lu bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+
+    return;
+
+error_cleanup:
+    ESP_LOGE(TAG, "Initialization failed, cleaning up...");
+    if (lottie_buf)
+    {
+        heap_caps_free(lottie_buf);
+        lottie_buf = NULL;
+    }
+    if (draw_buf)
+    {
+        heap_caps_free(draw_buf);
+        draw_buf = NULL;
+    }
+    if (splash_Screen)
+    {
+        lv_obj_delete(splash_Screen);
+        splash_Screen = NULL;
+    }
+    lottie = NULL;
+}
+
+void splash_screen_cleanup(void)
+{
+    ESP_LOGI(TAG, "=== Cleaning up splash screen ===");
+
+    // Prevent re-entry
+    if (cleanup_in_progress)
+    {
+        ESP_LOGW(TAG, "Cleanup already in progress!");
+        return;
+    }
+    cleanup_in_progress = true;
+
+// Lock LVGL mutex if available
+#ifdef CONFIG_LV_USE_LVGL_PORT_LOCK
+    if (lv_lock != NULL)
+    {
+        xSemaphoreTake(lv_lock, portMAX_DELAY);
+    }
+#endif
+
+    // Stop animation and detach buffer FIRST
+    if (lottie != NULL)
+    {
+        ESP_LOGI(TAG, "Stopping animation...");
+
+        // Delete all animations on this object
+        lv_anim_delete(lottie, NULL);
+
+        // CRITICAL: Detach buffer before deleting widget
+        // This prevents ThorVG from accessing freed memory
+        lv_lottie_set_draw_buf(lottie, NULL);
+
+        ESP_LOGI(TAG, "✓ Animation stopped and buffer detached");
+
+        // Allow pending operations to complete
+        vTaskDelay(pdMS_TO_TICKS(50));
+
+        // Now safe to delete
+        ESP_LOGI(TAG, "Deleting lottie widget...");
+        lv_obj_delete(lottie);
+        lottie = NULL;
+        ESP_LOGI(TAG, "✓ Lottie widget deleted");
+    }
+
+    // Delete parent screen
+    if (splash_Screen != NULL)
+    {
+        ESP_LOGI(TAG, "Deleting splash screen...");
+        lv_obj_delete(splash_Screen);
+        splash_Screen = NULL;
+        ESP_LOGI(TAG, "✓ Screen deleted");
+    }
+
+#ifdef CONFIG_LV_USE_LVGL_PORT_LOCK
+    if (lv_lock != NULL)
+    {
+        xSemaphoreGive(lv_lock);
+    }
+#endif
+
+    // Wait for LVGL to process all deletions
+    ESP_LOGI(TAG, "Waiting for LVGL cleanup...");
+    vTaskDelay(pdMS_TO_TICKS(150));
+
+    // Free buffers in reverse order of allocation
+    if (lottie_buf != NULL)
+    {
+        ESP_LOGI(TAG, "Freeing pixel buffer...");
+        heap_caps_free(lottie_buf);
+        lottie_buf = NULL;
+        ESP_LOGI(TAG, "✓ Pixel buffer freed");
+    }
+
+    if (draw_buf != NULL)
+    {
+        ESP_LOGI(TAG, "Freeing draw buffer descriptor...");
+        heap_caps_free(draw_buf);
+        draw_buf = NULL;
+        ESP_LOGI(TAG, "✓ Draw buffer descriptor freed");
+    }
+
+    cleanup_in_progress = false;
+
+    ESP_LOGI(TAG, "=== Cleanup complete ===");
+    ESP_LOGI(TAG, "Free DRAM: %lu bytes", heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    ESP_LOGI(TAG, "Free PSRAM: %lu bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 }

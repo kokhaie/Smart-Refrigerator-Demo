@@ -13,7 +13,6 @@
 #include "ui_controller.h"
 #include "lcd_manager.h"
 
-
 static const char *TAG = "MAIN_APP";
 
 void app_status_update_cb(network_status_t status)
@@ -79,6 +78,7 @@ void app_main(void)
     // motor_manager_init();
     // business_logic_start();
     // touch_slider_init();
+
     lcd_manager_start();
 
     // // Start network manager (Wi-Fi + MQTT)

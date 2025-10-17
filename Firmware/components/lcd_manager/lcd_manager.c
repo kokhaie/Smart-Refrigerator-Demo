@@ -124,21 +124,27 @@ void lcd_manager_start(void)
     const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     ESP_ERROR_CHECK(lvgl_port_init(&lvgl_cfg));
 
-    // Allocate LVGL framebuffers in PSRAM
-    size_t fb_size = LCD_H_RES * LCD_V_RES;
-    lvgl_buf1 = heap_caps_malloc(fb_size * sizeof(lv_color_t),
-                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    lvgl_buf2 = heap_caps_malloc(fb_size * sizeof(lv_color_t),
-                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    // --- Allocate LVGL framebuffers in PSRAM (aligned) ---
+    size_t fb_size = LCD_H_RES * LCD_V_RES * sizeof(lv_color_t);
+
+    lvgl_buf1 = (lv_color_t *)heap_caps_aligned_alloc(
+        128, fb_size,
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    lvgl_buf2 = (lv_color_t *)heap_caps_aligned_alloc(
+        128, fb_size,
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+
     assert(lvgl_buf1 && lvgl_buf2);
 
+    // --- Register LVGL display ---
     lvgl_disp = lv_display_create(LCD_H_RES, LCD_V_RES);
     lv_display_set_flush_cb(lvgl_disp, psram_flush_cb);
-    lv_display_set_buffers(lvgl_disp,
-                           lvgl_buf1,
-                           lvgl_buf2,
-                           fb_size,
-                           LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_buffers(
+        lvgl_disp,
+        lvgl_buf1,
+        lvgl_buf2,
+        fb_size,
+        LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_user_data(lvgl_disp, panel_handle);
 
     ESP_LOGI(TAG, "Load SquareLine UI");
