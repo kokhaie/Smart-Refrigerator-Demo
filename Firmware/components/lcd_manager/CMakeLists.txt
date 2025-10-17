@@ -3,7 +3,7 @@ idf_component_register(SRCS
                     "lcd_manager.c"
                     # --- SquareLine Studio Generated UI ---
                     "ui.c"
-                    "ui_helpers.c"
+                    # "ui_helpers.c"
                     "screens/ui_Screen1.c"
                     "screens/splash_screen.c"
                     "components/ui_comp_hook.c"
@@ -25,4 +25,4 @@ idf_component_register(SRCS
                     "images"
                     "fonts"
                     # --- Component Dependencies ---
-                    REQUIRES esp_lcd spiffs esp_psram lvgl esp_timer)
+                    REQUIRES esp_lcd spiffs esp_psram lvgl esp_lvgl_port esp_timer)

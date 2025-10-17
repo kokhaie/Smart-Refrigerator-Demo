@@ -6,4 +6,3 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 # "Trim" the build. Include the minimal set of components, main, and anything it depends on.
 # idf_build_set_property(MINIMAL_BUILD ON)
 project(smart-home-appliance-firmware)
-target_compile_options(__idf_lvgl__lvgl PRIVATE -Wno-error=format -Wno-error=type-limits)

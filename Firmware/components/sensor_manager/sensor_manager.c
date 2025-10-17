@@ -384,7 +384,7 @@ esp_err_t sensor_manager_init(void)
     vTaskDelay(pdMS_TO_TICKS(100));
 
     // Tasks
-    xTaskCreatePinnedToCore(mpu_task, "mpu_task", 4096, NULL, 12, NULL, 1);
+    xTaskCreatePinnedToCore(mpu_task, "mpu_task", 6144, NULL, 12, NULL, 1);
     xTaskCreatePinnedToCore(ina_task, "ina_task", 2048, NULL, 6, NULL, 1);
     xTaskCreatePinnedToCore(shtc_task, "shtc_task", 4096, NULL, 5, NULL, 1);
 

@@ -61,36 +61,36 @@ void app_status_update_cb(network_status_t status)
 }
 void app_main(void)
 {
-    // Init NVS for WiFi / MQTT credentials
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
-    ESP_ERROR_CHECK(ret);
+    // // Init NVS for WiFi / MQTT credentials
+    // esp_err_t ret = nvs_flash_init();
+    // if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    // {
+    //     vTaskDelay(pdMS_TO_TICKS(1000));
+    // }
+    // ESP_ERROR_CHECK(ret);
 
-    // Init sensor manager
-    if (sensor_manager_init() != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Sensor initialization failed. Halting.");
-        return;
-    }
+    // // Init sensor manager
+    // if (sensor_manager_init() != ESP_OK)
+    // {
+    //     ESP_LOGE(TAG, "Sensor initialization failed. Halting.");
+    //     return;
+    // }
 
-    motor_manager_init();
-    business_logic_start();
-    touch_slider_init();
+    // motor_manager_init();
+    // business_logic_start();
+    // touch_slider_init();
     lcd_manager_start();
 
     // // Start network manager (Wi-Fi + MQTT)
-    network_manager_start(app_status_update_cb);
-    led_manager_init();
-    ESP_ERROR_CHECK(ui_controller_init());
+    // network_manager_start(app_status_update_cb);
+    // led_manager_init();
+    // ESP_ERROR_CHECK(ui_controller_init());
 
     // Logger is independent of network → always available
     // data_logger_start();
 
     while (1)
     {
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
