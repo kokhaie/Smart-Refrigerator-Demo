@@ -34,6 +34,7 @@ static TaskHandle_t s_rainbow_task = NULL;
 static bool s_rainbow_running = false;
 static led_effect_t s_active_effect = LED_EFFECT_NONE;
 static SemaphoreHandle_t s_led_lock = NULL;
+static float s_brightness_scale = 0.35f;
 
 static void rainbow_task(void *arg);
 static inline void led_lock(void);
@@ -57,9 +58,26 @@ static inline void led_unlock(void)
     }
 }
 
+static inline uint8_t led_apply_scale(uint8_t component)
+{
+    float scaled = (float)component * s_brightness_scale;
+    if (scaled < 0.0f)
+    {
+        scaled = 0.0f;
+    }
+    else if (scaled > 255.0f)
+    {
+        scaled = 255.0f;
+    }
+    return (uint8_t)lroundf(scaled);
+}
+
 static inline void led_apply_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
-    ESP_ERROR_CHECK(led_strip_set_pixel(s_led_strip, 0, r, g, b));
+    uint8_t sr = led_apply_scale(r);
+    uint8_t sg = led_apply_scale(g);
+    uint8_t sb = led_apply_scale(b);
+    ESP_ERROR_CHECK(led_strip_set_pixel(s_led_strip, 0, sr, sg, sb));
     ESP_ERROR_CHECK(led_strip_refresh(s_led_strip));
 }
 
@@ -148,6 +166,7 @@ void led_manager_init(void)
     ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &s_led_strip));
     s_active_effect = LED_EFFECT_NONE;
     ESP_LOGI(TAG, "LED Manager initialized (1 LED at GPIO %d)", LED_STRIP_GPIO_PIN);
+    ESP_LOGI(TAG, "Default LED brightness scale set to %.0f%%", s_brightness_scale * 100.0f);
 }
 
 void led_manager_show_normal(uint8_t r, uint8_t g, uint8_t b)
@@ -350,4 +369,29 @@ void led_manager_clear(void)
     ESP_ERROR_CHECK(led_strip_refresh(s_led_strip));
     s_active_effect = LED_EFFECT_NONE;
     led_unlock();
+}
+
+void led_manager_set_global_brightness(float normalized)
+{
+    if (isnan(normalized) || isinf(normalized))
+    {
+        ESP_LOGW(TAG, "Ignoring invalid brightness value: %f", (double)normalized);
+        return;
+    }
+
+    float clamped = normalized;
+    if (clamped < 0.0f)
+    {
+        clamped = 0.0f;
+    }
+    else if (clamped > 1.0f)
+    {
+        clamped = 1.0f;
+    }
+
+    led_lock();
+    s_brightness_scale = clamped;
+    led_unlock();
+
+    ESP_LOGI(TAG, "LED brightness scale set to %.0f%%", clamped * 100.0f);
 }

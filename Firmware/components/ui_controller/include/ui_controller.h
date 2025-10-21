@@ -16,13 +16,14 @@ typedef enum {
 } ui_state_t;
 
 // Temperature configuration
-#define TEMP_MIN_CELSIUS 2.0f
+#define TEMP_MIN_CELSIUS 0.0f
 #define TEMP_MAX_CELSIUS 8.0f
 #define TEMP_DEFAULT_CELSIUS 5.0f
 
 // UI Configuration
 #define SLIDER_TOUCH_THRESHOLD 10    // Touch events before considering it a slide
 #define BREATHING_BASE_INTENSITY 100  // Base brightness for breathing effect
+#define SLIDER_EDGE_MARGIN_PCT 12.0f  // Increased margin so extremes stay off the physical edges
 
 // Initialize UI controller
 esp_err_t ui_controller_init(void);

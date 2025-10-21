@@ -1,11 +1,12 @@
 #include <stdio.h>
 #include <math.h>
+#include <stdbool.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_timer.h"
 #include "esp_log.h"
-#include "motors.h"
+#include "motor_manager.h"
 #include "business_logic.h"
 #include "sensor_manager.h"
 
@@ -48,6 +49,17 @@ static bool duty_on = false; // Duty starts OFF
 // Ramped duty state
 static float current_duty = 0.0f;
 
+// Mode customisation
+static float s_mode_duty_scale = 1.0f;
+static float s_mode_max_duty = 100.0f;
+static float s_ramp_up_rate = DUTY_RAMP_UP;
+static float s_ramp_down_rate = DUTY_RAMP_DOWN;
+static business_logic_mode_t s_active_mode = BUSINESS_LOGIC_MODE_SMART;
+static business_logic_temp_observer_t s_temp_observer = NULL;
+static business_logic_mode_reached_cb_t s_mode_reached_cb = NULL;
+static bool s_rapid_completion_armed = false;
+static float s_rapid_revert_tolerance_c = 0.3f;
+
 // ------------------- Simulation Update -------------------
 static void sim_update(float fan_percent, float dt_sec, float ambient_c)
 {
@@ -81,6 +93,11 @@ void update_setpoint(float new_setpoint)
         setpoint = new_setpoint;
         ESP_LOGW(TAG, "Setpoint queue not ready; applied setpoint %.2f°C directly", new_setpoint);
     }
+
+    if (s_active_mode == BUSINESS_LOGIC_MODE_RAPID)
+    {
+        s_rapid_completion_armed = true;
+    }
 }
 
 // ------------------- PID Task -------------------
@@ -107,6 +124,11 @@ void pid_fan_control_task(void *pvParameters)
             ESP_LOGI(TAG, "🎯 New setpoint: %.1f°C", received_setpoint);
             setpoint = received_setpoint;
             integral_term = 0.0f; // Reset integral term
+
+            if (s_active_mode == BUSINESS_LOGIC_MODE_RAPID)
+            {
+                s_rapid_completion_armed = true;
+            }
         }
 
         // --- Read sensor (for display only - not used in simulation mode) ---
@@ -231,18 +253,32 @@ void pid_fan_control_task(void *pvParameters)
         // Compute target duty
         float target_duty = (fan_on && duty_on) ? duty_pct : 0.0f;
 
+        if (target_duty > 0.0f)
+        {
+            float scaled = target_duty * s_mode_duty_scale;
+            float max_allowed = (s_mode_max_duty <= 0.0f) ? 100.0f : s_mode_max_duty;
+            if (scaled > max_allowed)
+            {
+                scaled = max_allowed;
+            }
+            target_duty = scaled;
+        }
+
         // ------------------- Asymmetric Ramping -------------------
         // The fan shouldn't jump instantly from 0 to 100; change gradually
 
-        if (target_duty > current_duty + DUTY_RAMP_UP)
+        float ramp_up = (s_ramp_up_rate > 0.0f) ? s_ramp_up_rate : DUTY_RAMP_UP;
+        float ramp_down = (s_ramp_down_rate > 0.0f) ? s_ramp_down_rate : DUTY_RAMP_DOWN;
+
+        if (target_duty > current_duty + ramp_up)
         {
             // Need to go up - increase quickly
-            current_duty += DUTY_RAMP_UP;
+            current_duty += ramp_up;
         }
-        else if (target_duty < current_duty - DUTY_RAMP_DOWN)
+        else if (target_duty < current_duty - ramp_down)
         {
             // Need to go down - decrease slowly
-            current_duty -= DUTY_RAMP_DOWN;
+            current_duty -= ramp_down;
         }
         else
         {
@@ -255,10 +291,30 @@ void pid_fan_control_task(void *pvParameters)
             current_duty = 100.0f;
         if (current_duty < 0.0f)
             current_duty = 0.0f;
+        if (current_duty > s_mode_max_duty && s_mode_max_duty > 0.0f)
+            current_duty = s_mode_max_duty;
 
         // ------------------- Apply to hardware -------------------
         set_fan_speed((uint8_t)current_duty);
         last_fan_percent = current_duty;
+
+        if (s_temp_observer != NULL)
+        {
+            s_temp_observer(process_variable);
+        }
+
+        if (s_active_mode == BUSINESS_LOGIC_MODE_RAPID && s_rapid_completion_armed)
+        {
+            float tolerance = (s_rapid_revert_tolerance_c > 0.0f) ? s_rapid_revert_tolerance_c : 0.3f;
+            if (process_variable <= (setpoint + tolerance))
+            {
+                s_rapid_completion_armed = false;
+                if (s_mode_reached_cb != NULL)
+                {
+                    s_mode_reached_cb(BUSINESS_LOGIC_MODE_RAPID);
+                }
+            }
+        }
 
         // ------------------- Status output -------------------
         ESP_LOGI(TAG,
@@ -284,4 +340,56 @@ void business_logic_start(void)
     g_setpoint_queue = xQueueCreate(1, sizeof(float));
     xTaskCreatePinnedToCore(pid_fan_control_task, "pid_fan_control",
                             4096, NULL, 5, NULL, 1);
+}
+
+void business_logic_apply_mode_profile(const business_logic_mode_profile_t *profile)
+{
+    if (profile == NULL)
+    {
+        return;
+    }
+
+    s_active_mode = profile->mode;
+
+    s_mode_duty_scale = (profile->duty_scale > 0.0f) ? profile->duty_scale : 1.0f;
+    s_mode_max_duty = (profile->max_duty_percent > 0.0f) ? fminf(profile->max_duty_percent, 100.0f) : 100.0f;
+
+    s_ramp_up_rate = (profile->ramp_up_rate > 0.0f) ? profile->ramp_up_rate : DUTY_RAMP_UP;
+    s_ramp_down_rate = (profile->ramp_down_rate > 0.0f) ? profile->ramp_down_rate : DUTY_RAMP_DOWN;
+
+    if (profile->revert_tolerance_c > 0.0f)
+    {
+        s_rapid_revert_tolerance_c = profile->revert_tolerance_c;
+    }
+    else
+    {
+        s_rapid_revert_tolerance_c = 0.3f;
+    }
+
+    if (s_active_mode == BUSINESS_LOGIC_MODE_RAPID)
+    {
+        s_rapid_completion_armed = true;
+    }
+    else
+    {
+        s_rapid_completion_armed = false;
+    }
+
+    ESP_LOGI(TAG, "Applied mode profile: mode=%d duty_scale=%.2f max=%.1f ramp_up=%.1f ramp_down=%.1f tol=%.2f",
+             (int)s_active_mode,
+             (double)s_mode_duty_scale,
+             (double)s_mode_max_duty,
+             (double)s_ramp_up_rate,
+             (double)s_ramp_down_rate,
+             (double)s_rapid_revert_tolerance_c);
+}
+
+void business_logic_register_temperature_observer(business_logic_temp_observer_t observer)
+{
+    s_temp_observer = observer;
+}
+
+void business_logic_register_mode_reached_callback(business_logic_mode_reached_cb_t cb)
+{
+    s_mode_reached_cb = cb;
 }

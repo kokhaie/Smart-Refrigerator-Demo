@@ -34,4 +34,11 @@ void led_manager_show_temperature_gradient(float current_temp, float setpoint, f
 void led_manager_show_error_flash(void);
 void led_manager_show_success_flash(void);
 
+/**
+ * @brief Adjust the global brightness applied to every LED effect.
+ *
+ * @param normalized A value between 0.0 (off) and 1.0 (full brightness).
+ */
+void led_manager_set_global_brightness(float normalized);
+
 #endif // LED_MANAGER_H

@@ -25,6 +25,10 @@
     "mosquitto.h": "c",
     "stdbool.h": "c",
     "inet.h": "c",
+    "ui.h": "c",
+    "lvgl.h": "c",
+    "lv_lottie.h": "c",
+    "ui_screen1.h": "c"
     "math.h": "c",
     "task.h": "c",
     "sdkconfig.h": "c",
