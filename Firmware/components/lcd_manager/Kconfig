@@ -82,5 +82,13 @@ menu "GPIO Pin Configuration"
     endif
 endmenu
 
+config LCD_UI_ASSET_BASE_PATH
+    string "LVGL asset base path"
+    default ""
+    help
+        Base directory accessible through LVGL's file system APIs where exported assets
+        (assets/fonts, assets/images, etc.) from the XML project are stored. Leave empty if not using
+        file-backed assets.
+
 endif
 endmenu

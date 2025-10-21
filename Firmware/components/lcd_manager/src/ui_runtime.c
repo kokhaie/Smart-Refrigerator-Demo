@@ -3,7 +3,7 @@
 // LVGL version: 9.2.2
 // Project name: SquareLine_Project
 
-#include "ui.h"
+#include "ui/ui.h"
 // #include "ui_helpers.h"
 
 ///////////////////// VARIABLES ////////////////////
@@ -29,14 +29,14 @@ void ui_init(lv_disp_t *disp)
     lv_theme_t *theme = lv_theme_default_init(disp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED),
                                               true, LV_FONT_DEFAULT);
     lv_disp_set_theme(disp, theme);
-    // ui_Screen1_screen_init();
-    splash_screen_init();
-    // ui____initial_actions0 = lv_obj_create(NULL);
-    // lv_disp_load_scr(ui_Screen1);
-    lv_disp_load_scr(splash_Screen);
+    dashboard_view_set_dark_theme(true);
+    dashboard_view_set_room_temperature(4);
+    dashboard_view_set_target_temperature(4);
+    dashboard_view_init();
+    lv_disp_load_scr(dashboard_view_root);
 }
 
 void ui_destroy(void)
 {
-    ui_Screen1_screen_destroy();
+    dashboard_view_deinit();
 }

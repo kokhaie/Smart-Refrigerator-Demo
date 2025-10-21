@@ -13,6 +13,8 @@ static const char *TAG = "TouchSlider";
 #define TAP_SLIDE_TOLERANCE 10
 #define DOUBLE_TOUCH_TIME_MS 300
 #define DOUBLE_TOUCH_POS_THRESHOLD 15
+#define SLIDER_POSITION_MAX 100U
+#define SLIDER_EDGE_MARGIN 8U
 
 // --- Hardware & Calibration --- //
 #define TOUCH_SLIDER_CHANNEL_NUM 5
@@ -26,11 +28,11 @@ static const touch_pad_t channel_array[TOUCH_SLIDER_CHANNEL_NUM] = {
 };
 
 static const float channel_sens_array[TOUCH_SLIDER_CHANNEL_NUM] = {
-    0.01F,
-    0.01F,
-    0.01F,
-    0.01F,
-    0.01F,
+    0.018F,
+    0.018F,
+    0.018F,
+    0.018F,
+    0.018F,
 };
 
 // --- State Machine and Variables --- //
@@ -50,11 +52,66 @@ static volatile uint32_t g_slider_position = 0;
 static volatile bool g_double_touch_detected = false;
 static volatile bool g_single_touch_detected = false;
 static volatile bool g_is_currently_touched = false;  // NEW: Track if finger is on slider
+static volatile uint64_t g_last_event_time = 0;
+
+#define TOUCH_RELEASE_TIMEOUT_US 150000
+
+static inline uint32_t touch_slider_map_position(uint32_t raw_position)
+{
+    // Reverse orientation so UI treats high hardware values as the low end
+    if (raw_position > SLIDER_POSITION_MAX)
+    {
+        raw_position = SLIDER_POSITION_MAX;
+    }
+
+    uint32_t adjusted = SLIDER_POSITION_MAX - raw_position;
+
+    if (adjusted < SLIDER_EDGE_MARGIN)
+    {
+        adjusted = SLIDER_EDGE_MARGIN;
+    }
+    else if (adjusted > (SLIDER_POSITION_MAX - SLIDER_EDGE_MARGIN))
+    {
+        adjusted = SLIDER_POSITION_MAX - SLIDER_EDGE_MARGIN;
+    }
+
+    return adjusted;
+}
+
+static void touch_slider_force_release(void)
+{
+    uint64_t now = esp_timer_get_time();
+    g_is_currently_touched = false;
+    g_slide_event_count = 0;
+    g_slider_state = STATE_IDLE;
+    g_last_release_time = now;
+    g_last_event_time = now;
+    ESP_LOGW(TAG, "Touch timeout - forcing release");
+}
+
+static bool touch_slider_check_timeout(void)
+{
+    if (!g_is_currently_touched)
+    {
+        return false;
+    }
+
+    uint64_t now = esp_timer_get_time();
+    if ((now - g_last_event_time) > TOUCH_RELEASE_TIMEOUT_US)
+    {
+        touch_slider_force_release();
+        return true;
+    }
+
+    return false;
+}
 
 // --- Main Event Callback --- //
 static void slider_event_callback(touch_slider_handle_t out_handle, touch_slider_message_t *msg, void *arg)
 {
-    g_slider_position = msg->position;
+    uint32_t adjusted_position = touch_slider_map_position(msg->position);
+    g_slider_position = adjusted_position;
+    g_last_event_time = esp_timer_get_time();
 
     switch (msg->event)
     {
@@ -66,30 +123,30 @@ static void slider_event_callback(touch_slider_handle_t out_handle, touch_slider
         {
             uint64_t now = esp_timer_get_time();
             uint64_t time_since_release = (now - g_last_release_time) / 1000;
-            int pos_diff = abs((int)msg->position - (int)g_first_touch_pos);
+            int pos_diff = abs((int)adjusted_position - (int)g_first_touch_pos);
 
             if (time_since_release < DOUBLE_TOUCH_TIME_MS &&
                 pos_diff < DOUBLE_TOUCH_POS_THRESHOLD &&
                 g_slide_event_count <= TAP_SLIDE_TOLERANCE)
             {
                 g_double_touch_detected = true;
-                ESP_LOGI(TAG, ">>> Double Touch Detected at position %lu! <<<", msg->position);
+                ESP_LOGI(TAG, ">>> Double Touch Detected at position %lu! <<<", adjusted_position);
                 g_slider_state = STATE_TOUCHED;
                 g_slide_event_count = 0;
             }
             else
             {
                 g_slider_state = STATE_TOUCHED;
-                g_first_touch_pos = msg->position;
+                g_first_touch_pos = adjusted_position;
                 g_slide_event_count = 0;
             }
         }
         else
         {
             g_slider_state = STATE_TOUCHED;
-            g_first_touch_pos = msg->position;
+            g_first_touch_pos = adjusted_position;
             g_slide_event_count = 0;
-            ESP_LOGI(TAG, "Touch started at position %lu", msg->position);
+            ESP_LOGI(TAG, "Touch started at position %lu", adjusted_position);
         }
         break;
     }
@@ -97,12 +154,12 @@ static void slider_event_callback(touch_slider_handle_t out_handle, touch_slider
     case TOUCH_SLIDER_EVT_ON_RELEASE:
     {
         g_is_currently_touched = false;  // NEW: Mark as released
+        g_last_release_time = g_last_event_time;
         
         if (g_slide_event_count <= TAP_SLIDE_TOLERANCE)
         {
             // This was a tap, not a slide
             g_slider_state = STATE_WAITING_FOR_SECOND_TOUCH;
-            g_last_release_time = esp_timer_get_time();
             ESP_LOGI(TAG, "Tap detected, waiting for second touch");
         }
         else
@@ -117,6 +174,11 @@ static void slider_event_callback(touch_slider_handle_t out_handle, touch_slider
 
     case TOUCH_SLIDER_EVT_ON_CALCULATION:
     {
+        if (!g_is_currently_touched)
+        {
+            break;
+        }
+
         g_slide_event_count++;
         
         // NEW: Transition to SLIDING state after tolerance exceeded
@@ -129,7 +191,7 @@ static void slider_event_callback(touch_slider_handle_t out_handle, touch_slider
         // Log position updates during sliding
         if (g_slider_state == STATE_SLIDING)
         {
-            ESP_LOGI(TAG, "Sliding: position = %lu", msg->position);
+            ESP_LOGI(TAG, "Sliding: position = %lu", adjusted_position);
         }
         break;
     }
@@ -173,6 +235,11 @@ esp_err_t touch_slider_init(void)
 
 uint32_t touch_slider_get_position(void)
 {
+    if (touch_slider_check_timeout())
+    {
+        return UINT32_MAX;
+    }
+
     // NEW: Return position whenever finger is on the slider
     if (g_is_currently_touched)
     {
@@ -183,6 +250,7 @@ uint32_t touch_slider_get_position(void)
 
 bool touch_slider_is_sliding(void)
 {
+    touch_slider_check_timeout();
     // NEW: Check if currently in a slide gesture
     return (g_slider_state == STATE_SLIDING);
 }

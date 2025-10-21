@@ -1,5 +1,6 @@
 #include "lcd_manager.h"
 #include <stdio.h>
+#include <stdint.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_timer.h"
@@ -12,7 +13,7 @@
 #include "lvgl.h"
 #include "esp_lvgl_port.h"
 #include "esp_heap_caps.h"
-#include "ui.h"
+#include "ui/ui.h"
 
 static const char *TAG = "LCD_MANAGER";
 
@@ -190,4 +191,76 @@ void lcd_manager_start(void)
     ui_init(lvgl_disp);
 
     lvgl_port_unlock();
+}
+
+static inline void lcd_manager_apply_with_lock(void (*fn)(int32_t), int32_t value, const char *what)
+{
+    if (lvgl_disp == NULL)
+    {
+        fn(value);
+        return;
+    }
+
+    if (lvgl_port_lock(50))
+    {
+        fn(value);
+        lvgl_port_unlock();
+    }
+    else
+    {
+        ESP_LOGW(TAG, "LVGL lock timeout while updating %s", what);
+    }
+}
+
+void lcd_manager_set_thermostat_target(int32_t temperature_c)
+{
+    lcd_manager_apply_with_lock(dashboard_view_set_target_temperature, temperature_c, "thermostat target");
+}
+
+void lcd_manager_set_room_temperature(int32_t temperature_c)
+{
+    lcd_manager_apply_with_lock(dashboard_view_set_room_temperature, temperature_c, "room temperature");
+}
+
+void lcd_manager_set_mode_display(const char *label, uint32_t accent_rgb24)
+{
+    if (label == NULL)
+    {
+        label = "";
+    }
+
+    if (lvgl_disp == NULL)
+    {
+        dashboard_view_set_mode_display(label, accent_rgb24);
+        return;
+    }
+
+    if (lvgl_port_lock(50))
+    {
+        dashboard_view_set_mode_display(label, accent_rgb24);
+        lvgl_port_unlock();
+    }
+    else
+    {
+        ESP_LOGW(TAG, "LVGL lock timeout while updating mode badge");
+    }
+}
+
+void lcd_manager_set_connectivity_state(lcd_connectivity_state_t state)
+{
+    if (lvgl_disp == NULL)
+    {
+        dashboard_view_set_connectivity_state(state);
+        return;
+    }
+
+    if (lvgl_port_lock(50))
+    {
+        dashboard_view_set_connectivity_state(state);
+        lvgl_port_unlock();
+    }
+    else
+    {
+        ESP_LOGW(TAG, "LVGL lock timeout while updating connectivity LED");
+    }
 }

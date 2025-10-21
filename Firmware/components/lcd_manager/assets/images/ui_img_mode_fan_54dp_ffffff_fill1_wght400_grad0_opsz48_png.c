@@ -3,7 +3,7 @@
 // LVGL version: 9.2.2
 // Project name: SquareLine_Project
 
-#include "../ui.h"
+#include "ui/ui.h"
 
 #ifndef LV_ATTRIBUTE_MEM_ALIGN
     #define LV_ATTRIBUTE_MEM_ALIGN
@@ -113,4 +113,3 @@ const lv_image_dsc_t ui_img_mode_fan_54dp_ffffff_fill1_wght400_grad0_opsz48_png 
     .header.magic = LV_IMAGE_HEADER_MAGIC,
     .data = ui_img_mode_fan_54dp_ffffff_fill1_wght400_grad0_opsz48_png_data
 };
-

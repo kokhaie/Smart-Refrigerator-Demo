@@ -1,4 +1,4 @@
-#include "../ui.h"
+#include "ui/ui.h"
 #include "freertos/FreeRTOS.h"
 #include "esp_log.h"
 static const char *TAG = "SPLASH";
