@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "esp_heap_caps.h"
 #include <math.h>
 #include <string.h>
 
@@ -62,13 +63,16 @@ static volatile shtc3_data_t latest_shtc = {0};
 
 // ------------------------- Queues -------------------------
 #define STREAM_QUEUE_LEN 5 // for MQTT/real-time graph
-#define BATCH_QUEUE_LEN 4   // number of batches buffered
+#define RAW_QUEUE_LEN 32   // high-rate consumers (USB logging)
+#define BATCH_QUEUE_LEN 4  // number of batches buffered
 
 static QueueHandle_t stream_queue;
+static QueueHandle_t raw_queue;
 static QueueHandle_t batch_queue;
 
-static synchronized_sample_t batch_buf[BATCH_SIZE];
+static synchronized_sample_t (*batch_pool)[BATCH_SIZE] = NULL;
 static int batch_index = 0;
+static int batch_write_slot = 0;
 static int downsample_counter = 0;
 
 // ------------------------- I2C Helpers -------------------------
@@ -78,7 +82,7 @@ static esp_err_t i2c_write(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t val
     if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(20)))
     {
         uint8_t buf[2] = {reg, val};
-        ret = i2c_master_transmit(dev, buf, 2, -1);
+        ret = i2c_master_transmit(dev, buf, 2, 100);  // 100ms timeout instead of -1
         xSemaphoreGive(i2c_mutex);
     }
     return ret;
@@ -89,7 +93,7 @@ static esp_err_t i2c_read(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t *dat
     esp_err_t ret = ESP_FAIL;
     if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(20)))
     {
-        ret = i2c_master_transmit_receive(dev, &reg, 1, data, len, -1);
+        ret = i2c_master_transmit_receive(dev, &reg, 1, data, len, 100);  // 100ms timeout instead of -1
         xSemaphoreGive(i2c_mutex);
     }
     return ret;
@@ -107,16 +111,46 @@ static void mpu_reset_fifo(void)
     i2c_write(mpu_dev, REG_FIFO_EN, FIFO_EN_ACCEL);
 }
 
-static void mpu_init(void)
+static esp_err_t mpu_init(void)
 {
     ESP_LOGI(TAG, "Initializing MPU...");
-    i2c_write(mpu_dev, REG_PWR_MGMT_1, 0x00);
+    esp_err_t ret;
+
+    ret = i2c_write(mpu_dev, REG_PWR_MGMT_1, 0x00);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "MPU power management write failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
     vTaskDelay(pdMS_TO_TICKS(100));
-    i2c_write(mpu_dev, REG_SMPLRT_DIV, 0x00);
-    i2c_write(mpu_dev, REG_CONFIG, 0x03);
-    i2c_write(mpu_dev, REG_ACCEL_CONFIG, 0x00);
+
+    ret = i2c_write(mpu_dev, REG_SMPLRT_DIV, 0x00);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "MPU sample rate write failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ret = i2c_write(mpu_dev, REG_CONFIG, 0x03);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "MPU config write failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ret = i2c_write(mpu_dev, REG_ACCEL_CONFIG, 0x00);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "MPU accel config write failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
     mpu_reset_fifo();
-    i2c_write(mpu_dev, REG_INT_ENABLE, INT_EN_DATA_RDY | INT_EN_FIFO_OFLOW);
+
+    ret = i2c_write(mpu_dev, REG_INT_ENABLE, INT_EN_DATA_RDY | INT_EN_FIFO_OFLOW);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "MPU interrupt enable write failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "MPU initialized successfully");
+    return ESP_OK;
 }
 
 // ISR
@@ -167,14 +201,25 @@ static void mpu_task(void *arg)
                     xSemaphoreGive(data_mutex);
                 }
 
-                // Push to real-time queue
+                // Push to raw 1 kHz queue for high-rate consumers
+                if (raw_queue != NULL)
+                {
+                    if (xQueueSend(raw_queue, &pkt, 0) != pdPASS)
+                    {
+                        synchronized_sample_t dummy;
+                        xQueueReceive(raw_queue, &dummy, 0); // drop oldest
+                        xQueueSend(raw_queue, &pkt, 0);
+                    }
+                }
+
+                // Push to decimated real-time queue
                 if (++downsample_counter >= 200)
                 { // 1000/100 = 10 Hz
                     downsample_counter = 0;
 
                     if (xQueueSend(stream_queue, &pkt, 0) != pdPASS)
                     {
-                        ESP_LOGI(TAG, "Stream queue full, replaceing with oldest");
+                        // ESP_LOGI(TAG, "Stream queue full, replaceing with oldest");
                         // Queue full → drop oldest
                         synchronized_sample_t dummy;
                         xQueueReceive(stream_queue, &dummy, 0); // remove one
@@ -182,16 +227,22 @@ static void mpu_task(void *arg)
                     }
                 }
 
-                // // Fill batch
-                // batch_buf[batch_index++] = pkt;
-                // if (batch_index == BATCH_SIZE)
-                // {
-                //     if (xQueueSend(batch_queue, batch_buf, 0) != pdPASS)
-                //     {
-                //         ESP_LOGW(TAG, "Batch queue full, dropping batch");
-                //     }
-                //     batch_index = 0;
-                // }
+                // Fill batch
+                synchronized_sample_t *current_batch = batch_pool[batch_write_slot];
+                current_batch[batch_index++] = pkt;
+                if (batch_index == BATCH_SIZE)
+                {
+                    synchronized_sample_t *completed = current_batch;
+                    if (xQueueSend(batch_queue, &completed, 0) != pdPASS)
+                    {
+                        ESP_LOGW(TAG, "Batch queue full, dropping batch");
+                    }
+                    else
+                    {
+                        batch_write_slot = (batch_write_slot + 1) % BATCH_QUEUE_LEN;
+                    }
+                    batch_index = 0;
+                }
             }
         }
     }
@@ -299,10 +350,20 @@ bool sensor_manager_get_next_sample(synchronized_sample_t *out, TickType_t timeo
     return (xQueueReceive(stream_queue, out, timeout) == pdTRUE);
 }
 
+bool sensor_manager_get_raw_sample(synchronized_sample_t *out, TickType_t timeout)
+{
+    return (xQueueReceive(raw_queue, out, timeout) == pdTRUE);
+}
+
 bool sensor_manager_get_batch(synchronized_sample_t *out_batch, int *out_count, TickType_t timeout)
 {
-    if (xQueueReceive(batch_queue, out_batch, timeout) == pdTRUE)
+    synchronized_sample_t *batch_ptr = NULL;
+    if (xQueueReceive(batch_queue, &batch_ptr, timeout) == pdTRUE && batch_ptr != NULL)
     {
+        if (out_batch != NULL)
+        {
+            memcpy(out_batch, batch_ptr, sizeof(synchronized_sample_t) * BATCH_SIZE);
+        }
         *out_count = BATCH_SIZE;
         return true;
     }
@@ -329,7 +390,10 @@ esp_err_t sensor_manager_init(void)
         .scl_io_num = 16,
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = false};
+        .flags.enable_internal_pullup = false};  
+    ESP_LOGI(TAG, "I2C bus config: SDA=GPIO%d, SCL=GPIO%d, pullups=%s",
+             cfg.sda_io_num, cfg.scl_io_num,
+             cfg.flags.enable_internal_pullup ? "ENABLED" : "DISABLED");
     ESP_ERROR_CHECK(i2c_new_master_bus(&cfg, &bus_handle));
 
     i2c_device_config_t dev_cfg = {
@@ -342,19 +406,30 @@ esp_err_t sensor_manager_init(void)
     mpu_sem = xSemaphoreCreateBinary();
 
     stream_queue = xQueueCreate(STREAM_QUEUE_LEN, sizeof(synchronized_sample_t));
-    // batch_queue = xQueueCreate(BATCH_QUEUE_LEN, sizeof(synchronized_sample_t) * BATCH_SIZE);
+    raw_queue = xQueueCreate(RAW_QUEUE_LEN, sizeof(synchronized_sample_t));
     batch_queue = xQueueCreate(BATCH_QUEUE_LEN, sizeof(synchronized_sample_t *));
-
-    if (!i2c_mutex || !data_mutex || !mpu_sem || !stream_queue || !batch_queue)
+    batch_pool = (synchronized_sample_t(*)[BATCH_SIZE])heap_caps_calloc(
+        BATCH_QUEUE_LEN, sizeof(*batch_pool), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!batch_pool)
     {
-        ESP_LOGE(TAG, "Failed to allocate RTOS objects (queue/semaphore creation failed)");
+        batch_pool = (synchronized_sample_t(*)[BATCH_SIZE])heap_caps_calloc(
+            BATCH_QUEUE_LEN, sizeof(*batch_pool), MALLOC_CAP_8BIT);
+    }
+
+    if (!i2c_mutex || !data_mutex || !mpu_sem || !stream_queue || !raw_queue || !batch_queue || !batch_pool)
+    {
+        ESP_LOGE(TAG, "Failed to allocate sensor manager resources");
         return ESP_ERR_NO_MEM;
     }
 
     // MPU
     dev_cfg.device_address = MPU_ADDR;
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &mpu_dev));
-    mpu_init();
+    esp_err_t mpu_ret = mpu_init();
+    if (mpu_ret != ESP_OK) {
+        ESP_LOGE(TAG, "MPU initialization failed. Check I2C connections (SDA=GPIO15, SCL=GPIO16) and pullup resistors.");
+        return mpu_ret;
+    }
 
     // INA
     dev_cfg.device_address = INA226_DEVICE_ADDRESS;
@@ -365,10 +440,10 @@ esp_err_t sensor_manager_init(void)
     uint8_t cal_cmd[3] = {INA226_REG_CALIB, (cal >> 8) & 0xFF, cal & 0xFF};
     if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(20)))
     {
-        i2c_master_transmit(ina_dev, cal_cmd, 3, -1);
+        i2c_master_transmit(ina_dev, cal_cmd, 3, 100);  // 100ms timeout
         uint8_t cfg_cmd[3] = {INA226_REG_CONFIG, (INA226_DEFAULT_CONFIG >> 8) & 0xFF,
                               INA226_DEFAULT_CONFIG & 0xFF};
-        i2c_master_transmit(ina_dev, cfg_cmd, 3, -1);
+        i2c_master_transmit(ina_dev, cfg_cmd, 3, 100);  // 100ms timeout
         xSemaphoreGive(i2c_mutex);
     }
 
