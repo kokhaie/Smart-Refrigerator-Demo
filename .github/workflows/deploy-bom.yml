@@ -34,7 +34,10 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+          name: pcb-bom-site
 
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: pcb-bom-site
