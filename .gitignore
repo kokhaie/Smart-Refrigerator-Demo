@@ -62,3 +62,59 @@ pytest_embedded_log/
 dependencies.lock
 
 managed_components/
+
+# IDE/editor artifacts
+*.class
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+*.iml
+*.ipr
+*.iws
+.idea/
+#.vscode/
+
+# Flutter MobileApplication build outputs
+MobileApplication/**/doc/api/
+MobileApplication/**/ios/Flutter/.last_build_id
+MobileApplication/.dart_tool/
+MobileApplication/.flutter-plugins
+MobileApplication/.flutter-plugins-dependencies
+MobileApplication/.fvm/
+MobileApplication/.packages
+MobileApplication/.pub-cache/
+MobileApplication/.pub/
+MobileApplication/build/
+MobileApplication/coverage/
+MobileApplication/**/ephemeral/
+
+# Flutter iOS/macOS artifacts
+MobileApplication/ios/Pods/
+MobileApplication/ios/.symlinks/
+MobileApplication/ios/Flutter/Flutter.framework
+MobileApplication/ios/Flutter/Flutter.podspec
+MobileApplication/ios/Flutter/Generated.xcconfig
+MobileApplication/macos/Pods/
+MobileApplication/macos/.symlinks/
+MobileApplication/macos/Flutter/GeneratedPluginRegistrant.swift
+MobileApplication/macos/Flutter/ephemeral/
+
+# Flutter Android/Gradle artifacts
+MobileApplication/android/.gradle/
+MobileApplication/android/local.properties
+MobileApplication/android/key.properties
+MobileApplication/**/GeneratedPluginRegistrant.*
+
+# Flutter build products
+MobileApplication/app.*.symbols
+MobileApplication/app.*.map.json
+MobileApplication/android/app/debug
+MobileApplication/android/app/profile
+MobileApplication/android/app/release
