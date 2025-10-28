@@ -2,7 +2,12 @@
 # https://github.com/github/gitignore/blob/master/KiCad.gitignore
 
 # For PCBs designed using KiCad: http://www.kicad-pcb.org/
-# Format documentation: http://kicad-pcb.org/help/file-formats/
+# Format documentation: http://kicad-pcb.org/help/file-formats/\
+# python 
+/venv
+
+# Jupeter
+.ipynb_checkpoints/
 
 # Temporary files
 *.000

@@ -1,3 +1,3 @@
 idf_component_register(SRCS "motor_manager.c"
                     INCLUDE_DIRS "include"
-                    REQUIRES esp_driver_ledc)
+                    REQUIRES esp_driver_ledc anomaly_detector)

@@ -76,6 +76,14 @@ esp_err_t sensor_manager_init(void);
 bool sensor_manager_get_next_sample(synchronized_sample_t *out, TickType_t timeout);
 
 /**
+ * @brief Get the next raw 1 kHz sample.
+ * @param out Pointer to store the sample
+ * @param timeout Timeout ticks to wait
+ * @return true if a sample was retrieved, false otherwise
+ */
+bool sensor_manager_get_raw_sample(synchronized_sample_t *out, TickType_t timeout);
+
+/**
  * @brief Get the latest full batch of samples (for AI training).
  * @param out_batch Pointer to buffer to hold the batch (must be size BATCH_SIZE)
  * @param out_count Returns the number of samples (should always be BATCH_SIZE)
