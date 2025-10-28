@@ -25,10 +25,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Sync BOM into docs
+        run: |
+          mkdir -p docs
+          cp PCB/bom.html docs/bom.html
+
       - name: Prepare site content
         run: |
           mkdir -p dist
-          cp PCB/bom.html dist/index.html
+          cp -R docs/. dist/
 
       - name: Upload static site artifact
         uses: actions/upload-pages-artifact@v3
