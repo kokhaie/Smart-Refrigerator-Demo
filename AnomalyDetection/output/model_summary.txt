@@ -15,7 +15,7 @@ MODEL:
   Number of trees:      30
   Max depth:            10
   Total nodes:          4,858
-  Training time:        0.09 seconds
+  Training time:        0.10 seconds
 
 ACCURACY:
   Overall accuracy:     99.46%
