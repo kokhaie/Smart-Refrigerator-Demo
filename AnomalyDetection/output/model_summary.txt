@@ -1,0 +1,55 @@
+
+======================================================================
+MODEL PERFORMANCE SUMMARY
+======================================================================
+
+DATASET:
+  Total samples:        14,710
+  Training samples:     11,768 (80.0%)
+  Test samples:         2,942 (20.0%)
+  Features per sample:  5
+  Classes:              4
+
+MODEL:
+  Algorithm:            Random Forest
+  Number of trees:      30
+  Max depth:            10
+  Total nodes:          4,858
+  Training time:        0.10 seconds
+
+ACCURACY:
+  Overall accuracy:     99.46%
+  Target accuracy:      95%
+  Status:               ✓ PASSED
+
+PER-CLASS ACCURACY:
+  NORMAL         :  99.60%
+  BEARING_WEAR   :  99.72%
+  IMBALANCE      :  98.51%
+  ELECTRICAL     : 100.00%
+
+TOP 3 IMPORTANT FEATURES:
+  kurtosis            : 0.3023
+  rms                 : 0.2653
+  spectral_entropy    : 0.2312
+
+FILES GENERATED:
+  ✓ rf_model.pkl               - Trained Random Forest model
+  ✓ feature_scaler.pkl         - StandardScaler for normalization
+  ✓ extracted_features.csv     - All extracted features
+  ✓ extracted_labels.npy       - Corresponding labels
+  ✓ raw_data_visualization.png - Raw data plots
+  ✓ feature_distributions.png  - Feature distribution plots
+  ✓ feature_correlation.png    - Correlation heatmap
+  ✓ confusion_matrix.png       - Confusion matrix
+  ✓ feature_importance.png     - Feature importance plot
+
+NEXT STEPS:
+  1. If accuracy >= 95%: Proceed to C code export (Cell 16)
+  2. If accuracy < 95%: 
+     - Collect more data (especially for low-accuracy classes)
+     - Adjust hyperparameters (n_estimators, max_depth)
+     - Add more features or remove correlated features
+  3. Test on validation set (separate session5 files)
+
+======================================================================
